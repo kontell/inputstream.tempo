@@ -16,25 +16,27 @@
 
 #include <kodi/addon-instance/Inputstream.h>
 
-static const std::string PROGRAM_NUMBER = "inputstream.ffmpegdirect.program_number";
-static const std::string IS_REALTIME_STREAM = "inputstream.ffmpegdirect.is_realtime_stream";
-static const std::string STREAM_MODE = "inputstream.ffmpegdirect.stream_mode";
-static const std::string OPEN_MODE = "inputstream.ffmpegdirect.open_mode";
-static const std::string MANIFEST_TYPE = "inputstream.ffmpegdirect.manifest_type";
-static const std::string DEFAULT_URL = "inputstream.ffmpegdirect.default_url";
-static const std::string PLAYBACK_AS_LIVE = "inputstream.ffmpegdirect.playback_as_live";
-static const std::string PROGRAMME_START_TIME = "inputstream.ffmpegdirect.programme_start_time";
-static const std::string PROGRAMME_END_TIME = "inputstream.ffmpegdirect.programme_end_time";
-static const std::string CATCHUP_URL_FORMAT_STRING = "inputstream.ffmpegdirect.catchup_url_format_string";
-static const std::string CATCHUP_URL_NEAR_LIVE_FORMAT_STRING = "inputstream.ffmpegdirect.catchup_url_near_live_format_string";
-static const std::string CATCHUP_BUFFER_START_TIME = "inputstream.ffmpegdirect.catchup_buffer_start_time";
-static const std::string CATCHUP_BUFFER_END_TIME = "inputstream.ffmpegdirect.catchup_buffer_end_time";
-static const std::string CATCHUP_BUFFER_OFFSET = "inputstream.ffmpegdirect.catchup_buffer_offset";
-static const std::string CATCHUP_TERMINATES = "inputstream.ffmpegdirect.catchup_terminates";
-static const std::string CATCHUP_GRANULARITY = "inputstream.ffmpegdirect.catchup_granularity";
-static const std::string TIMEZONE_SHIFT = "inputstream.ffmpegdirect.timezone_shift";
-static const std::string DEFAULT_PROGRAMME_DURATION = "inputstream.ffmpegdirect.default_programme_duration";
-static const std::string PROGRAMME_CATCHUP_ID = "inputstream.ffmpegdirect.programme_catchup_id";
+static const std::string PROGRAM_NUMBER = "inputstream.tempo.program_number";
+static const std::string IS_REALTIME_STREAM = "inputstream.tempo.is_realtime_stream";
+static const std::string STREAM_MODE = "inputstream.tempo.stream_mode";
+static const std::string OPEN_MODE = "inputstream.tempo.open_mode";
+static const std::string MANIFEST_TYPE = "inputstream.tempo.manifest_type";
+static const std::string DEFAULT_URL = "inputstream.tempo.default_url";
+static const std::string PLAYBACK_AS_LIVE = "inputstream.tempo.playback_as_live";
+static const std::string PROGRAMME_START_TIME = "inputstream.tempo.programme_start_time";
+static const std::string PROGRAMME_END_TIME = "inputstream.tempo.programme_end_time";
+static const std::string CATCHUP_URL_FORMAT_STRING = "inputstream.tempo.catchup_url_format_string";
+static const std::string CATCHUP_URL_NEAR_LIVE_FORMAT_STRING = "inputstream.tempo.catchup_url_near_live_format_string";
+static const std::string CATCHUP_BUFFER_START_TIME = "inputstream.tempo.catchup_buffer_start_time";
+static const std::string CATCHUP_BUFFER_END_TIME = "inputstream.tempo.catchup_buffer_end_time";
+static const std::string CATCHUP_BUFFER_OFFSET = "inputstream.tempo.catchup_buffer_offset";
+static const std::string CATCHUP_TERMINATES = "inputstream.tempo.catchup_terminates";
+static const std::string CATCHUP_GRANULARITY = "inputstream.tempo.catchup_granularity";
+static const std::string TIMEZONE_SHIFT = "inputstream.tempo.timezone_shift";
+static const std::string DEFAULT_PROGRAMME_DURATION = "inputstream.tempo.default_programme_duration";
+static const std::string PROGRAMME_CATCHUP_ID = "inputstream.tempo.programme_catchup_id";
+static const std::string AUDIO_TEMPO = "inputstream.tempo.tempo";
+static const std::string AUDIO_TEMPO_FILE = "inputstream.tempo.tempo_file";
 
 class ATTR_DLL_LOCAL InputStreamFFmpegDirect
   : public kodi::addon::CInstanceInputStream, ffmpegdirect::IManageDemuxPacket

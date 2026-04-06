@@ -154,6 +154,14 @@ bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props
     {
       m_properties.m_programmeCatchupId = prop.second;
     }
+    else if (AUDIO_TEMPO == prop.first)
+    {
+      m_properties.m_audioTempo = std::stod(prop.second);
+    }
+    else if (AUDIO_TEMPO_FILE == prop.first)
+    {
+      m_properties.m_tempoFilePath = prop.second;
+    }
   }
 
   m_streamUrl = props.GetURL();

@@ -48,6 +48,9 @@ namespace ffmpegdirect
     int m_catchupGranularity = 1;
     int m_timezoneShiftSecs = 0;
     int m_defaultProgrammeDurationSecs = 4 * 60 * 60; //Four hours
-    std::string m_programmeCatchupId;      
+    std::string m_programmeCatchupId;
+
+    double m_audioTempo = 1.0;
+    std::string m_tempoFilePath;
   };
 } //namespace ffmpegdirect

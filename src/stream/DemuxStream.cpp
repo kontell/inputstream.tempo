@@ -168,11 +168,25 @@ bool DemuxStreamAudioFFmpeg::GetInformation(kodi::addon::InputstreamInfo& info)
 {
   DemuxStream::GetInformation(info);
 
-  info.SetChannels(iChannels);
-  info.SetSampleRate(iSampleRate);
-  info.SetBitRate(iBitRate);
-  info.SetBitsPerSample(iBitsPerSample);
-  info.SetBlockAlign(iBlockAlign);
+  if (m_tempoActive)
+  {
+    // Override codec to PCM float — tempo-processed audio is decoded
+    info.SetCodecName("pcm_f32le");
+    info.SetExtraData(nullptr, 0);
+    info.SetChannels(iChannels);
+    info.SetSampleRate(iSampleRate);
+    info.SetBitsPerSample(32);
+    info.SetBlockAlign(iChannels * 4);
+    info.SetBitRate(iSampleRate * iChannels * 32);
+  }
+  else
+  {
+    info.SetChannels(iChannels);
+    info.SetSampleRate(iSampleRate);
+    info.SetBitRate(iBitRate);
+    info.SetBitsPerSample(iBitsPerSample);
+    info.SetBlockAlign(iBlockAlign);
+  }
 
   return true;
 }

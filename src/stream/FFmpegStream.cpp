@@ -156,6 +156,13 @@ FFmpegStream::FFmpegStream(IManageDemuxPacket* demuxPacketManager, const Propert
   FFmpegLog::SetLogLevel(AV_LOG_INFO);
   FFmpegLog::SetEnabled(kodi::addon::GetSettingBoolean("allowFFmpegLogging"));
   av_log_set_callback(ff_avutil_log);
+
+  // Tempo processing
+  m_currentTempo = props.m_audioTempo;
+  m_tempoFilePath = props.m_tempoFilePath;
+  m_tempoEnabled = (m_currentTempo != 1.0 || !m_tempoFilePath.empty());
+  if (m_tempoEnabled)
+    Log(LOGLEVEL_INFO, "Tempo processing enabled: %.2fx (file: %s)", m_currentTempo, m_tempoFilePath.c_str());
 }
 
 FFmpegStream::~FFmpegStream()
@@ -279,6 +286,20 @@ void FFmpegStream::DemuxFlush()
     avformat_flush(m_pFormatContext);
   }
 
+  // Flush tempo pipeline
+  if (m_tempoEnabled && m_audioDecoderCtx)
+  {
+    avcodec_flush_buffers(m_audioDecoderCtx);
+    while (!m_tempoOutputQueue.empty())
+    {
+      m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
+      m_tempoOutputQueue.pop();
+    }
+    m_tempoOutputPts = 0.0;
+    // Rebuild filter graph to clear internal atempo buffers
+    BuildFilterGraph(m_currentTempo);
+  }
+
   m_currentPts = STREAM_NOPTS_VALUE;
 
   m_pkt.result = -1;
@@ -291,6 +312,29 @@ void FFmpegStream::DemuxFlush()
 
 DEMUX_PACKET* FFmpegStream::DemuxRead()
 {
+  // Return buffered tempo-processed packets first
+  if (m_tempoEnabled && !m_tempoOutputQueue.empty())
+  {
+    DEMUX_PACKET* queued = m_tempoOutputQueue.front();
+    m_tempoOutputQueue.pop();
+
+    // Resolve stream ID to unique ID
+    if (queued->iStreamId >= 0)
+    {
+      DemuxStream* stream = GetDemuxStream(queued->iStreamId);
+      if (stream)
+      {
+        queued->iStreamId = stream->uniqueId;
+        queued->demuxerId = m_demuxerId;
+      }
+    }
+    return queued;
+  }
+
+  // Periodically check tempo file for runtime changes
+  if (m_tempoEnabled && ++m_tempoCheckCounter % 50 == 0)
+    CheckTempoFileUpdate();
+
   DEMUX_PACKET* pPacket = NULL;
   // on some cases where the received packet is invalid we will need to return an empty packet (0 length) otherwise the main loop (in CVideoPlayer)
   // would consider this the end of stream and stop.
@@ -396,6 +440,33 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
 
       if (pPacket)
       {
+        // Tempo: route audio packets through decode+atempo pipeline
+        if (m_tempoEnabled && m_tempoAudioStreamIndex >= 0 &&
+            m_pkt.pkt.stream_index == m_tempoAudioStreamIndex)
+        {
+          // Free the pre-allocated packet — tempo pipeline creates its own
+          m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(pPacket);
+          pPacket = nullptr;
+
+          ProcessAudioPacketWithTempo(&m_pkt.pkt, stream);
+
+          m_pkt.result = -1;
+          av_packet_unref(&m_pkt.pkt);
+
+          // Return first queued packet if available, otherwise empty
+          if (!m_tempoOutputQueue.empty())
+          {
+            pPacket = m_tempoOutputQueue.front();
+            m_tempoOutputQueue.pop();
+          }
+          else
+          {
+            bReturnEmpty = true;
+          }
+        }
+        else
+        {
+        // Original non-tempo path
         if (m_bAVI && stream->codecpar && stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
         {
           // AVI's always have borked pts, specially if m_pFormatContext->flags includes
@@ -447,6 +518,7 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
         // store internal id until we know the continuous id presented to player
         // the stream might not have been created yet
         pPacket->iStreamId = m_pkt.pkt.stream_index;
+        } // end of else (non-tempo path)
       }
       m_pkt.result = -1;
       av_packet_unref(&m_pkt.pkt);
@@ -628,6 +700,8 @@ bool FFmpegStream::IsRealTimeStream()
 
 void FFmpegStream::Dispose()
 {
+  DestroyTempoProcessing();
+
   m_pkt.result = -1;
   av_packet_unref(&m_pkt.pkt);
 
@@ -1402,6 +1476,20 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
     hitEnd = true;
   }
 
+  // Reset tempo pipeline on seek
+  if (m_tempoEnabled && m_audioDecoderCtx)
+  {
+    avcodec_flush_buffers(m_audioDecoderCtx);
+    while (!m_tempoOutputQueue.empty())
+    {
+      m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
+      m_tempoOutputQueue.pop();
+    }
+    // Set output PTS to the seek target (time is in ms, convert to STREAM_TIME_BASE)
+    m_tempoOutputPts = STREAM_MSEC_TO_TIME(time);
+    BuildFilterGraph(m_currentTempo);
+  }
+
   m_pkt.result = -1;
   av_packet_unref(&m_pkt.pkt);
 
@@ -1932,6 +2020,19 @@ DemuxStream* FFmpegStream::AddStream(int streamIdx)
 
         if (av_dict_get(pStream->metadata, "title", NULL, 0))
           st->m_description = av_dict_get(pStream->metadata, "title", NULL, 0)->value;
+
+        // Init tempo processing for the first audio stream
+        if (m_tempoEnabled && m_tempoAudioStreamIndex < 0)
+        {
+          if (InitTempoProcessing(pStream))
+          {
+            st->m_tempoActive = true;
+            st->codec = AV_CODEC_ID_PCM_F32LE;
+            st->iBitsPerSample = 32;
+            st->iBlockAlign = codecparChannels * 4;
+            st->iBitRate = pStream->codecpar->sample_rate * codecparChannels * 32;
+          }
+        }
 
         break;
       }
@@ -2549,6 +2650,257 @@ void FFmpegStream::GetL16Parameters(int &channels, int &samplerate)
         }
         pos = content.find(';', pos); // find next parameter
       }
+    }
+  }
+}
+
+// ── Tempo processing implementation ──
+
+bool FFmpegStream::InitTempoProcessing(AVStream* audioStream)
+{
+  const AVCodec* decoder = avcodec_find_decoder(audioStream->codecpar->codec_id);
+  if (!decoder)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: could not find decoder for audio stream");
+    return false;
+  }
+
+  m_audioDecoderCtx = avcodec_alloc_context3(decoder);
+  if (!m_audioDecoderCtx)
+    return false;
+
+  if (avcodec_parameters_to_context(m_audioDecoderCtx, audioStream->codecpar) < 0)
+  {
+    avcodec_free_context(&m_audioDecoderCtx);
+    return false;
+  }
+
+  if (avcodec_open2(m_audioDecoderCtx, decoder, nullptr) < 0)
+  {
+    avcodec_free_context(&m_audioDecoderCtx);
+    return false;
+  }
+
+  m_decodedFrame = av_frame_alloc();
+  m_filteredFrame = av_frame_alloc();
+  if (!m_decodedFrame || !m_filteredFrame)
+  {
+    DestroyTempoProcessing();
+    return false;
+  }
+
+  m_tempoAudioStreamIndex = audioStream->index;
+
+  if (!BuildFilterGraph(m_currentTempo))
+  {
+    DestroyTempoProcessing();
+    return false;
+  }
+
+  Log(LOGLEVEL_INFO, "Tempo: initialized decode+atempo pipeline at %.2fx (codec: %s, rate: %d, ch: %d)",
+      m_currentTempo, decoder->name, m_audioDecoderCtx->sample_rate,
+      m_audioDecoderCtx->ch_layout.nb_channels);
+
+  return true;
+}
+
+bool FFmpegStream::BuildFilterGraph(double tempo)
+{
+  // Tear down existing graph
+  if (m_filterGraph)
+    avfilter_graph_free(&m_filterGraph);
+
+  m_filterGraph = avfilter_graph_alloc();
+  if (!m_filterGraph)
+    return false;
+
+  const AVFilter* abuffer = avfilter_get_by_name("abuffer");
+  const AVFilter* atempo = avfilter_get_by_name("atempo");
+  const AVFilter* aformat = avfilter_get_by_name("aformat");
+  const AVFilter* abuffersink = avfilter_get_by_name("abuffersink");
+
+  if (!abuffer || !atempo || !aformat || !abuffersink)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: could not find required filters");
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  // Source: match decoder output format
+  char chLayoutStr[64] = {};
+  av_channel_layout_describe(&m_audioDecoderCtx->ch_layout, chLayoutStr, sizeof(chLayoutStr));
+
+  char srcArgs[256];
+  snprintf(srcArgs, sizeof(srcArgs),
+           "sample_rate=%d:sample_fmt=%s:channel_layout=%s:time_base=%d/%d",
+           m_audioDecoderCtx->sample_rate,
+           av_get_sample_fmt_name(m_audioDecoderCtx->sample_fmt),
+           chLayoutStr,
+           1, m_audioDecoderCtx->sample_rate);
+
+  int ret = avfilter_graph_create_filter(&m_bufferSrcCtx, abuffer, "in", srcArgs, nullptr, m_filterGraph);
+  if (ret < 0)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: failed to create abuffer: %d", ret);
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  // Atempo filter
+  AVFilterContext* atempoCtx = nullptr;
+  char tempoStr[32];
+  snprintf(tempoStr, sizeof(tempoStr), "%.4f", tempo);
+  ret = avfilter_graph_create_filter(&atempoCtx, atempo, "atempo", tempoStr, nullptr, m_filterGraph);
+  if (ret < 0)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: failed to create atempo filter: %d", ret);
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  // Aformat: force interleaved float output for Kodi
+  AVFilterContext* aformatCtx = nullptr;
+  char fmtArgs[128];
+  snprintf(fmtArgs, sizeof(fmtArgs), "sample_fmts=flt:sample_rates=%d:channel_layouts=%s",
+           m_audioDecoderCtx->sample_rate, chLayoutStr);
+  ret = avfilter_graph_create_filter(&aformatCtx, aformat, "aformat", fmtArgs, nullptr, m_filterGraph);
+  if (ret < 0)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: failed to create aformat filter: %d", ret);
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  // Sink
+  ret = avfilter_graph_create_filter(&m_bufferSinkCtx, abuffersink, "out", nullptr, nullptr, m_filterGraph);
+  if (ret < 0)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: failed to create abuffersink: %d", ret);
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  // Link: abuffer -> atempo -> aformat -> abuffersink
+  if (avfilter_link(m_bufferSrcCtx, 0, atempoCtx, 0) < 0 ||
+      avfilter_link(atempoCtx, 0, aformatCtx, 0) < 0 ||
+      avfilter_link(aformatCtx, 0, m_bufferSinkCtx, 0) < 0)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: failed to link filter graph");
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  ret = avfilter_graph_config(m_filterGraph, nullptr);
+  if (ret < 0)
+  {
+    Log(LOGLEVEL_ERROR, "Tempo: failed to configure filter graph: %d", ret);
+    avfilter_graph_free(&m_filterGraph);
+    return false;
+  }
+
+  Log(LOGLEVEL_INFO, "Tempo: filter graph built at %.2fx", tempo);
+  return true;
+}
+
+void FFmpegStream::DestroyTempoProcessing()
+{
+  // Drain the output queue
+  while (!m_tempoOutputQueue.empty())
+  {
+    m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
+    m_tempoOutputQueue.pop();
+  }
+
+  if (m_filterGraph)
+    avfilter_graph_free(&m_filterGraph);
+  m_bufferSrcCtx = nullptr;
+  m_bufferSinkCtx = nullptr;
+
+  if (m_audioDecoderCtx)
+    avcodec_free_context(&m_audioDecoderCtx);
+  if (m_decodedFrame)
+    av_frame_free(&m_decodedFrame);
+  if (m_filteredFrame)
+    av_frame_free(&m_filteredFrame);
+
+  m_tempoAudioStreamIndex = -1;
+}
+
+void FFmpegStream::CheckTempoFileUpdate()
+{
+  if (m_tempoFilePath.empty())
+    return;
+
+  try
+  {
+    std::ifstream f(m_tempoFilePath);
+    if (!f.is_open())
+      return;
+
+    double newTempo = 0;
+    f >> newTempo;
+    if (newTempo < 0.5 || newTempo > 100.0)
+      return;
+    if (std::abs(newTempo - m_currentTempo) < 0.001)
+      return;
+
+    Log(LOGLEVEL_INFO, "Tempo: changing from %.2fx to %.2fx", m_currentTempo, newTempo);
+
+    // Try live update via send_command (avoids graph rebuild + audio glitch)
+    char res[64] = {};
+    char tempoStr[32];
+    snprintf(tempoStr, sizeof(tempoStr), "%.4f", newTempo);
+    int ret = avfilter_graph_send_command(m_filterGraph, "atempo", "tempo", tempoStr, res, sizeof(res), 0);
+    if (ret < 0)
+    {
+      // Fallback: rebuild the graph
+      Log(LOGLEVEL_WARNING, "Tempo: send_command failed (%d), rebuilding graph", ret);
+      BuildFilterGraph(newTempo);
+    }
+    m_currentTempo = newTempo;
+  }
+  catch (...)
+  {
+  }
+}
+
+void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
+{
+  int ret = avcodec_send_packet(m_audioDecoderCtx, pkt);
+  if (ret < 0 && ret != AVERROR(EAGAIN))
+    return;
+
+  while (avcodec_receive_frame(m_audioDecoderCtx, m_decodedFrame) == 0)
+  {
+    ret = av_buffersrc_add_frame(m_bufferSrcCtx, m_decodedFrame);
+    av_frame_unref(m_decodedFrame);
+    if (ret < 0)
+      continue;
+
+    while (av_buffersink_get_frame(m_bufferSinkCtx, m_filteredFrame) == 0)
+    {
+      int channels = m_filteredFrame->ch_layout.nb_channels;
+      int bytesPerSample = 4; // float32
+      int pcmSize = m_filteredFrame->nb_samples * channels * bytesPerSample;
+
+      DEMUX_PACKET* outPkt = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(pcmSize);
+      if (outPkt)
+      {
+        memcpy(outPkt->pData, m_filteredFrame->data[0], pcmSize);
+        outPkt->iSize = pcmSize;
+        outPkt->iStreamId = stream->index;
+
+        // Compute timestamps based on output sample count
+        double duration = (double)m_filteredFrame->nb_samples / m_audioDecoderCtx->sample_rate;
+        outPkt->pts = m_tempoOutputPts;
+        outPkt->dts = m_tempoOutputPts;
+        outPkt->duration = STREAM_SEC_TO_TIME(duration);
+        m_tempoOutputPts += STREAM_SEC_TO_TIME(duration);
+
+        outPkt->demuxerId = m_demuxerId;
+        m_tempoOutputQueue.push(outPkt);
+      }
+      av_frame_unref(m_filteredFrame);
     }
   }
 }

@@ -234,6 +234,7 @@ public:
   bool GetInformation(kodi::addon::InputstreamInfo& info) override;
 
   std::string m_description;
+  bool m_tempoActive = false; // when true, report PCM codec instead of original
 protected:
   FFmpegStream* m_parent;
   AVStream* m_stream  = nullptr;

@@ -13,10 +13,12 @@
 #include "DemuxStream.h"
 #include "CurlInput.h"
 
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <sstream>
 
@@ -32,7 +34,12 @@ extern "C"
 {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
+#include <libavutil/channel_layout.h>
 #include <libavutil/mastering_display_metadata.h>
+#include <libavutil/opt.h>
 #include <libavutil/version.h>
 }
 
@@ -199,6 +206,29 @@ private:
   HttpProxy m_httpProxy;
   OpenMode m_openMode;
   StreamMode m_streamMode;
+
+  // ── Tempo processing ──
+  bool m_tempoEnabled = false;
+  double m_currentTempo = 1.0;
+  std::string m_tempoFilePath;
+  int m_tempoAudioStreamIndex = -1;
+
+  AVCodecContext* m_audioDecoderCtx = nullptr;
+  AVFilterGraph* m_filterGraph = nullptr;
+  AVFilterContext* m_bufferSrcCtx = nullptr;
+  AVFilterContext* m_bufferSinkCtx = nullptr;
+  AVFrame* m_decodedFrame = nullptr;
+  AVFrame* m_filteredFrame = nullptr;
+
+  std::queue<DEMUX_PACKET*> m_tempoOutputQueue;
+  double m_tempoOutputPts = 0.0;
+  int m_tempoCheckCounter = 0;
+
+  bool InitTempoProcessing(AVStream* audioStream);
+  void DestroyTempoProcessing();
+  bool BuildFilterGraph(double tempo);
+  void CheckTempoFileUpdate();
+  void ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream);
 };
 
 } //namespace ffmpegdirect
