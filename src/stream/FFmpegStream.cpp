@@ -286,7 +286,7 @@ void FFmpegStream::DemuxFlush()
     avformat_flush(m_pFormatContext);
   }
 
-  // Flush tempo pipeline
+  // Flush tempo pipeline (no graph rebuild — atempo handles discontinuities)
   if (m_tempoEnabled && m_audioDecoderCtx)
   {
     avcodec_flush_buffers(m_audioDecoderCtx);
@@ -296,8 +296,6 @@ void FFmpegStream::DemuxFlush()
       m_tempoOutputQueue.pop();
     }
     m_tempoOutputPts = 0.0;
-    // Rebuild filter graph to clear internal atempo buffers
-    BuildFilterGraph(m_currentTempo);
   }
 
   m_currentPts = STREAM_NOPTS_VALUE;
@@ -328,6 +326,7 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
         queued->demuxerId = m_demuxerId;
       }
     }
+
     return queued;
   }
 
@@ -537,7 +536,8 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
     DemuxStream* stream = GetDemuxStream(pPacket->iStreamId);
     if (!stream ||
         stream->pPrivate != m_pFormatContext->streams[pPacket->iStreamId] ||
-        stream->codec != m_pFormatContext->streams[pPacket->iStreamId]->codecpar->codec_id)
+        (stream->codec != m_pFormatContext->streams[pPacket->iStreamId]->codecpar->codec_id
+         && !(m_tempoEnabled && pPacket->iStreamId == m_tempoAudioStreamIndex)))
     {
       // content has changed, or stream did not yet exist
       stream = AddStream(pPacket->iStreamId);
@@ -1476,7 +1476,7 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
     hitEnd = true;
   }
 
-  // Reset tempo pipeline on seek
+  // Reset tempo pipeline on seek (no graph rebuild — just flush and set PTS)
   if (m_tempoEnabled && m_audioDecoderCtx)
   {
     avcodec_flush_buffers(m_audioDecoderCtx);
@@ -1485,9 +1485,7 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
       m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
       m_tempoOutputQueue.pop();
     }
-    // Set output PTS to the seek target (time is in ms, convert to STREAM_TIME_BASE)
     m_tempoOutputPts = STREAM_MSEC_TO_TIME(time);
-    BuildFilterGraph(m_currentTempo);
   }
 
   m_pkt.result = -1;
@@ -1565,19 +1563,21 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
 
   if (ret >= 0)
   {
-    kodi::tools::CEndTime timer(1000);
-    while (m_currentPts == STREAM_NOPTS_VALUE && !timer.IsTimePast())
     {
-      m_pkt.result = -1;
-      av_packet_unref(&m_pkt.pkt);
-
-      DEMUX_PACKET* pkt = DemuxRead();
-      if (!pkt)
+      kodi::tools::CEndTime timer(1000);
+      while (m_currentPts == STREAM_NOPTS_VALUE && !timer.IsTimePast())
       {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        continue;
+        m_pkt.result = -1;
+        av_packet_unref(&m_pkt.pkt);
+
+        DEMUX_PACKET* pkt = DemuxRead();
+        if (!pkt)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          continue;
+        }
+        m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(pkt);
       }
-      m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(pkt);
     }
   }
 
@@ -2021,7 +2021,7 @@ DemuxStream* FFmpegStream::AddStream(int streamIdx)
         if (av_dict_get(pStream->metadata, "title", NULL, 0))
           st->m_description = av_dict_get(pStream->metadata, "title", NULL, 0)->value;
 
-        // Init tempo processing for the first audio stream
+        // Init or preserve tempo processing for the audio stream
         if (m_tempoEnabled && m_tempoAudioStreamIndex < 0)
         {
           if (InitTempoProcessing(pStream))
@@ -2032,6 +2032,15 @@ DemuxStream* FFmpegStream::AddStream(int streamIdx)
             st->iBlockAlign = codecparChannels * 4;
             st->iBitRate = pStream->codecpar->sample_rate * codecparChannels * 32;
           }
+        }
+        else if (m_tempoEnabled && pStream->index == m_tempoAudioStreamIndex)
+        {
+          // Stream recreated (e.g. by codec mismatch check) — preserve tempo override
+          st->m_tempoActive = true;
+          st->codec = AV_CODEC_ID_PCM_F32LE;
+          st->iBitsPerSample = 32;
+          st->iBlockAlign = codecparChannels * 4;
+          st->iBitRate = pStream->codecpar->sample_rate * codecparChannels * 32;
         }
 
         break;

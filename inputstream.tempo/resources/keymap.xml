@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- inputstream.tempo keyboard shortcuts for playback speed control.
+     Auto-installed to special://userdata/keymaps/inputstream.tempo.xml
+     Keys: ] = speed up, [ = speed down, Backspace = reset to 1.0x -->
+<keymap>
+  <FullscreenVideo>
+    <keyboard>
+      <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
+      <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
+      <backspace>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</backspace>
+    </keyboard>
+  </FullscreenVideo>
+  <Visualisation>
+    <keyboard>
+      <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
+      <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
+      <backspace>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</backspace>
+    </keyboard>
+  </Visualisation>
+  <MusicOSD>
+    <keyboard>
+      <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
+      <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
+      <backspace>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</backspace>
+    </keyboard>
+  </MusicOSD>
+</keymap>
