@@ -8,4 +8,4 @@ The purpose of the fork is to add tempo (playback speed adjustment) for audio pl
 
 It works, however seeking is not available in the player.
 
-See https://github.com/xbmc/xbmc/pull/28163/ for a proposed fix.
+See https://github.com/xbmc/xbmc/pull/28179 for a proposed fix.
