@@ -150,20 +150,22 @@ if(NOT WIN32)
   set(FFMPEG_CONFIGURE_WRAPPER ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg-configure-wrapper.sh)
   file(WRITE ${FFMPEG_CONFIGURE_WRAPPER}
 "#!/bin/bash
-set -e
 export PKG_CONFIG_PATH='${CMAKE_INSTALL_PREFIX}/lib/pkgconfig'
 export PKG_CONFIG_LIBDIR='${CMAKE_INSTALL_PREFIX}/lib/pkgconfig'
 echo '=== ffmpeg configure env ==='
 echo \"PKG_CONFIG_PATH=$PKG_CONFIG_PATH\"
 echo \"PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR\"
-echo '--- pkgconfig dir contents:'
-ls -la \"$PKG_CONFIG_LIBDIR\" 2>&1 | head -20 || true
-echo '--- pkg-config gnutls probe:'
-pkg-config --exists gnutls && echo GNUTLS_FOUND || echo GNUTLS_NOT_FOUND
-pkg-config --cflags gnutls 2>&1 || true
-pkg-config --libs gnutls 2>&1 || true
-echo '=== end debug, running configure ==='
-exec '${CMAKE_SOURCE_DIR}/configure' \"$@\"
+echo '--- pkgconfig gnutls (static):'
+pkg-config --static --cflags gnutls 2>&1 || true
+pkg-config --static --libs gnutls 2>&1 || true
+echo '=== running configure ==='
+'${CMAKE_SOURCE_DIR}/configure' \"$@\"
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo '=== FFMPEG CONFIGURE FAILED — config.log tail ==='
+  tail -c 20000 ffbuild/config.log 2>/dev/null || true
+fi
+exit $rc
 ")
   execute_process(COMMAND chmod +x ${FFMPEG_CONFIGURE_WRAPPER})
 

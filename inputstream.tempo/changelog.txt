@@ -4,6 +4,11 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.19
+- ffmpeg configure wrapper now also dumps config.log on failure so we can
+  see the real compile-test error behind ffmpeg's misleading "gnutls not
+  found using pkg-config" message.
+
 v0.2.18
 - ffmpeg configure is now launched via a generated wrapper script that
   explicitly exports PKG_CONFIG_PATH / PKG_CONFIG_LIBDIR and prints a
