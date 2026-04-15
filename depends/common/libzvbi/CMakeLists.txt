@@ -15,6 +15,9 @@ list(APPEND zvbi_conf LDFLAGS=-L${CMAKE_INSTALL_PREFIX}/lib)
 if ((CORE_SYSTEM_NAME STREQUAL android) OR (CMAKE_CXX_COMPILER MATCHES arm-webos))
   list(APPEND zvbi_conf LIBS=-liconv)
 endif()
+if(DEFINED ENV{AUTOCONF_HOST})
+  list(APPEND zvbi_conf --host=$ENV{AUTOCONF_HOST})
+endif()
 
 include(ExternalProject)
 externalproject_add(libzvbi

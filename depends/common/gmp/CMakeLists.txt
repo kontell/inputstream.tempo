@@ -50,6 +50,9 @@ else()
   if(CORE_SYSTEM_NAME MATCHES "linux" AND CPU MATCHES "i.86")
       list(APPEND gmp_conf ABI=32)
   endif()
+  if(DEFINED ENV{AUTOCONF_HOST})
+    list(APPEND gmp_conf --host=$ENV{AUTOCONF_HOST})
+  endif()
 
   externalproject_add(gmp
                       SOURCE_DIR ${CMAKE_SOURCE_DIR}

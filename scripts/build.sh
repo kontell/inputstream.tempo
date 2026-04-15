@@ -201,6 +201,7 @@ case "${TARGET_OS}-${TARGET_ARCH}" in
         export AR="$NDK_BIN/llvm-ar"
         export STRIP="$NDK_BIN/llvm-strip"
         export RANLIB="$NDK_BIN/llvm-ranlib"
+        export AUTOCONF_HOST=armv7a-linux-androideabi
         ;;
     android-aarch64)
         export CC="$NDK_BIN/aarch64-linux-android21-clang"
@@ -208,6 +209,7 @@ case "${TARGET_OS}-${TARGET_ARCH}" in
         export AR="$NDK_BIN/llvm-ar"
         export STRIP="$NDK_BIN/llvm-strip"
         export RANLIB="$NDK_BIN/llvm-ranlib"
+        export AUTOCONF_HOST=aarch64-linux-android
         ;;
     linux-armv7)
         export CC=arm-linux-gnueabihf-gcc
@@ -215,6 +217,7 @@ case "${TARGET_OS}-${TARGET_ARCH}" in
         export AR=arm-linux-gnueabihf-ar
         export STRIP=arm-linux-gnueabihf-strip
         export RANLIB=arm-linux-gnueabihf-ranlib
+        export AUTOCONF_HOST=arm-linux-gnueabihf
         ;;
     linux-aarch64)
         export CC=aarch64-linux-gnu-gcc
@@ -222,6 +225,7 @@ case "${TARGET_OS}-${TARGET_ARCH}" in
         export AR=aarch64-linux-gnu-ar
         export STRIP=aarch64-linux-gnu-strip
         export RANLIB=aarch64-linux-gnu-ranlib
+        export AUTOCONF_HOST=aarch64-linux-gnu
         ;;
 esac
 

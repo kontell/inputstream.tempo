@@ -7,6 +7,9 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
 list(APPEND nettle_conf CPPFLAGS=-I${CMAKE_INSTALL_PREFIX}/include)
 list(APPEND nettle_conf LDFLAGS=-L${CMAKE_INSTALL_PREFIX}/lib)
 list(APPEND nettle_conf LIBS=-lgmp)
+if(DEFINED ENV{AUTOCONF_HOST})
+  list(APPEND nettle_conf --host=$ENV{AUTOCONF_HOST})
+endif()
 
 include(ExternalProject)
 externalproject_add(nettle
