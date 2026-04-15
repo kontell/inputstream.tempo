@@ -4,6 +4,12 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.23
+- Restore full release matrix (Linux x86_64/armv7/aarch64 + Android
+  armv7/aarch64, each on Kodi 21 Omega and Kodi 22 master). First release
+  where cross-compile is expected to work end-to-end after the fixes in
+  v0.2.12-0.2.22.
+
 v0.2.22
 - Disable gnutls zstd+brotli compression support (--without-zstd/brotli).
   Configure auto-detected the host system's zstd.pc and enabled the code,
