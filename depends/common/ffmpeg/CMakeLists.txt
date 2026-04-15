@@ -134,14 +134,21 @@ if(NOT WIN32)
   message(STATUS "FFMPEG_CONF (Standard): ${STANDARD_CONF}")
   message(STATUS "FFMPEG_CONF (Extra, OS dependend): ${EXTRA_CONF}")
 
-  # Use `cmake -E env` so PKG_CONFIG_PATH survives — the bash-style
+  # Use `cmake -E env` so the pkg-config vars survive — the bash-style
   # "VAR=val cmd" prefix doesn't work reliably through CMake's
-  # execute_process in cross-compile contexts (worked on native x86_64
-  # only because system pkg-config paths already contained gnutls.pc).
+  # execute_process in cross-compile contexts.
+  #
+  # Both PKG_CONFIG_LIBDIR (REPLACES the default system paths) and
+  # PKG_CONFIG_PATH (adds to them) are set. When cross-compiling to
+  # Android/ARM on a host that has system gnutls.pc (like the Ubuntu CI
+  # runner), PKG_CONFIG_PATH alone lets pkg-config fall back to host libs
+  # which the cross-linker can't resolve, so ffmpeg fails its gnutls
+  # compile-test. LIBDIR pins pkg-config to the cross-built dir only.
   externalproject_add(ffmpeg
                       SOURCE_DIR ${CMAKE_SOURCE_DIR}
                       CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
                         "PKG_CONFIG_PATH=${CMAKE_INSTALL_PREFIX}/lib/pkgconfig"
+                        "PKG_CONFIG_LIBDIR=${CMAKE_INSTALL_PREFIX}/lib/pkgconfig"
                         ${CMAKE_SOURCE_DIR}/configure
                         --prefix=${CMAKE_INSTALL_PREFIX}
                         --enable-pthreads

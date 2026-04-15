@@ -4,6 +4,13 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.17
+- Also set PKG_CONFIG_LIBDIR for ffmpeg configure, not just PKG_CONFIG_PATH.
+  On Ubuntu CI runners the host system has gnutls.pc at the default pkg-
+  config path, so PKG_CONFIG_PATH alone let pkg-config fall back to host
+  libs which the Android/ARM cross-linker can't resolve. LIBDIR replaces
+  the default search path so pkg-config pins to the cross-built libs only.
+
 v0.2.16
 - Fix cross-compile pkg-config discovery in ffmpeg configure: wrap the
   configure command with `cmake -E env PKG_CONFIG_PATH=...` instead of the
