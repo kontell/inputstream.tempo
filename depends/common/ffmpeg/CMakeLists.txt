@@ -134,9 +134,15 @@ if(NOT WIN32)
   message(STATUS "FFMPEG_CONF (Standard): ${STANDARD_CONF}")
   message(STATUS "FFMPEG_CONF (Extra, OS dependend): ${EXTRA_CONF}")
 
+  # Use `cmake -E env` so PKG_CONFIG_PATH survives — the bash-style
+  # "VAR=val cmd" prefix doesn't work reliably through CMake's
+  # execute_process in cross-compile contexts (worked on native x86_64
+  # only because system pkg-config paths already contained gnutls.pc).
   externalproject_add(ffmpeg
                       SOURCE_DIR ${CMAKE_SOURCE_DIR}
-                      CONFIGURE_COMMAND PKG_CONFIG_PATH=${CMAKE_INSTALL_PREFIX}/lib/pkgconfig ${CMAKE_SOURCE_DIR}/configure
+                      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+                        "PKG_CONFIG_PATH=${CMAKE_INSTALL_PREFIX}/lib/pkgconfig"
+                        ${CMAKE_SOURCE_DIR}/configure
                         --prefix=${CMAKE_INSTALL_PREFIX}
                         --enable-pthreads
                         --enable-gnutls

@@ -4,6 +4,13 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.16
+- Fix cross-compile pkg-config discovery in ffmpeg configure: wrap the
+  configure command with `cmake -E env PKG_CONFIG_PATH=...` instead of the
+  bash-style env-var prefix, which doesn't survive CMake's execute_process
+  in cross-compile contexts. Was masked on native x86_64 because system
+  pkg-config paths already contained gnutls.pc.
+
 v0.2.15
 - Fix Android ffmpeg configure: override CMAKE_C_COMPILER to the NDK's
   per-target wrapper (e.g. armv7a-linux-androideabi21-clang) which bakes
