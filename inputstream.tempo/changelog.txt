@@ -1,3 +1,6 @@
+v0.2.11
+- First release built and tagged through the new GitHub Actions pipeline.
+
 v0.2.10
 - Add xbmc.service extension so the background service actually runs under Kodi
 - Install per-addon keymap (reinstalled when the shipped file changes)
