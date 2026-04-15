@@ -4,14 +4,15 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
-v0.2.13
-- Fix Android armv7 build: pass CPU=armeabi-v7a (not armv7a) so Kodi's
-  Android ArchSetup recognises it and ffmpeg picks --cpu=cortex-a9 + ARM
-  arch instead of falling through to --cpu=i686 --disable-mmx (which made
-  the ARM clang fail to build executables).
-- Fix Linux libzvbi link: always pass -liconv to libzvbi LIBS, not just on
-  Android/webOS, so its utility binaries (zvbi-ntsc-cc, x11font) link
-  against the bundled libiconv.a on fresh Linux build hosts too.
+v0.2.14
+- Fix Android cross-compile: set CPU as a CACHE var in the toolchain file so
+  it survives into dep external_projects. Kodi's HandleDepends.cmake doesn't
+  forward -DCPU through BUILD_ARGS, so ffmpeg's CMakeLists previously saw
+  CPU as empty and fell through to --cpu=i686 --disable-mmx, breaking the
+  ARM clang.
+- Revert the libzvbi LIBS=-liconv change for non-Android hosts (it broke
+  fresh Linux runners — Ubuntu's glibc supplies iconv via libc, so adding
+  -liconv made the configure-time compiler test fail).
 
 v0.2.11
 - First release built and tagged through the new GitHub Actions pipeline.

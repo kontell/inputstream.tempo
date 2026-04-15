@@ -135,15 +135,16 @@ TCEOF
         ;;
     android-armv7)
         echo "  Toolchain: Android NDK ($NDK_PATH) armeabi-v7a"
-        # Kodi's cmake/scripts/android/ArchSetup.cmake expects CPU to be the
-        # NDK ABI string (armeabi-v7a / arm64-v8a / i686 / x86_64). Anything
-        # else and the CPU var is effectively unset for downstream deps —
-        # ffmpeg then falls through to --cpu=i686 --disable-mmx and clang
-        # fails to build because ARM toolchain + x86 flags is incoherent.
+        # CPU must be set as a CACHE var inside the toolchain file, because
+        # Kodi's HandleDepends.cmake doesn't include -DCPU=... in BUILD_ARGS
+        # passed to dep external_projects. Without this, ffmpeg's CMakeLists
+        # sees CPU as empty when invoked as a sub-build and falls through to
+        # --cpu=i686 --disable-mmx (incompatible with the ARM clang).
         TOOLCHAIN_FILE="$TOOLCHAIN_DIR/android-armv7.cmake"
         cat > "$TOOLCHAIN_FILE" << TCEOF
 set(ANDROID_ABI armeabi-v7a CACHE STRING "" FORCE)
 set(ANDROID_PLATFORM android-21 CACHE STRING "" FORCE)
+set(CPU armeabi-v7a CACHE STRING "" FORCE)
 include($NDK_PATH/build/cmake/android.toolchain.cmake)
 TCEOF
         CMAKE_ARGS+=(
@@ -157,6 +158,7 @@ TCEOF
         cat > "$TOOLCHAIN_FILE" << TCEOF
 set(ANDROID_ABI arm64-v8a CACHE STRING "" FORCE)
 set(ANDROID_PLATFORM android-21 CACHE STRING "" FORCE)
+set(CPU arm64-v8a CACHE STRING "" FORCE)
 include($NDK_PATH/build/cmake/android.toolchain.cmake)
 TCEOF
         CMAKE_ARGS+=(
