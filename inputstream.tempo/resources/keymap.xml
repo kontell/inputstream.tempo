@@ -1,18 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- inputstream.tempo keyboard/remote shortcuts for playback speed control.
-     Auto-installed to special://userdata/keymaps/inputstream.tempo.xml
+<!-- inputstream.tempo keyboard shortcuts for playback-speed control.
+     Auto-installed to special://userdata/keymaps/inputstream.tempo.xml.
+
+     Only keys unbound in the default Kodi keyboard map are used, so defaults
+     (Up=SkipNext, Down=SkipPrevious, Menu=OSD, Backspace=Fullscreen, etc.)
+     are preserved. speed.py bails out silently unless the calling addon has
+     dropped special://temp/inputstream_tempo_active, so these keys are also
+     no-ops during non-tempo playback.
+
      Keys:
-       ]          speed up one preset
-       [          speed down one preset
-       Backspace  reset to 1.0x
-       Menu / s   pick a speed from a dialog (remote Menu button or keyboard s) -->
+       [   speed down one step
+       ]   speed up   one step
+       =   reset to 1.0x
+       s   open the speed picker dialog -->
 <keymap>
   <FullscreenVideo>
     <keyboard>
       <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
       <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
-      <backspace>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</backspace>
-      <menu>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</menu>
+      <equals>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</equals>
       <s>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</s>
     </keyboard>
   </FullscreenVideo>
@@ -20,8 +26,7 @@
     <keyboard>
       <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
       <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
-      <backspace>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</backspace>
-      <menu>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</menu>
+      <equals>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</equals>
       <s>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</s>
     </keyboard>
   </Visualisation>
@@ -29,8 +34,7 @@
     <keyboard>
       <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
       <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
-      <backspace>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</backspace>
-      <menu>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</menu>
+      <equals>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</equals>
       <s>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</s>
     </keyboard>
   </MusicOSD>

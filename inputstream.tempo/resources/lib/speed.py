@@ -18,9 +18,14 @@ import time
 import xbmcgui
 import xbmcvfs
 
+import os
+
 TEMPO_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo')
 CONFIG_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_config')
 NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
+# Sentinel written by the calling addon while tempo is the active inputstream.
+# Keys/dialog are no-ops if missing, so bindings don't affect non-tempo playback.
+ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
 
 DEFAULT_STEP = 0.10
 DEFAULT_MIN = 0.5
@@ -104,6 +109,9 @@ def queue_notification(display):
 
 
 if __name__ == '__main__':
+    if not os.path.exists(ACTIVE_FILE):
+        sys.exit(0)
+
     cmd = sys.argv[1] if len(sys.argv) > 1 else ''
     step, lo, hi = read_config()
     current = read_tempo()

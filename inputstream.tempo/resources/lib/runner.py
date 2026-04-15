@@ -17,6 +17,7 @@ import xbmcvfs
 ADDON = xbmcaddon.Addon()
 TEMPO_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo')
 NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
+ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
 KEYMAP_SRC = os.path.join(ADDON.getAddonInfo('path'), 'resources', 'keymap.xml')
 KEYMAP_DST = xbmcvfs.translatePath('special://userdata/keymaps/inputstream.tempo.xml')
 
@@ -102,8 +103,11 @@ def run():
             except OSError:
                 pass
 
-        playing = player.isPlayingAudio()
-        if playing:
+        # Active only when audio is playing AND the calling addon has
+        # signalled that tempo is the active inputstream (via the sentinel
+        # file). Skins can gate their UI on InputstreamTempo.Active safely.
+        active = player.isPlayingAudio() and os.path.exists(ACTIVE_FILE)
+        if active:
             tempo = read_tempo()
             win.setProperty('InputstreamTempo.Speed', str(tempo))
             win.setProperty('InputstreamTempo.SpeedDisplay', '{:.1f}x'.format(tempo))

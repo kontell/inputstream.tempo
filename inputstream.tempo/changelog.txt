@@ -1,3 +1,15 @@
+v0.2.10
+- Add xbmc.service extension so the background service actually runs under Kodi
+- Install per-addon keymap (reinstalled when the shipped file changes)
+- Speed control script: [ / ] step, Backspace reset, s / menu dialog picker
+- Values driven by a shared JSON config file written by the calling addon
+- Debounced speed-change notification (single toast after key-repeat settles)
+- Sentinel file gates the key bindings and Active window property so they do
+  nothing (and the dialog doesn't appear) when tempo is not the active stream
+- Replace removed xbmc.translatePath with xbmcvfs.translatePath (Kodi 21)
+- Runner sets Window(Home).Property(InputstreamTempo.Speed / SpeedDisplay /
+  Active) for skin integration
+
 v22.2.0
 - Bump ffmpeg to 8.0 and add patch to merge in libpostproc plugin before ffmpeg-build
 - gmp: download from GNU Mirror
