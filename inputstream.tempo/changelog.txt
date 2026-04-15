@@ -4,6 +4,14 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.15
+- Fix Android ffmpeg configure: override CMAKE_C_COMPILER to the NDK's
+  per-target wrapper (e.g. armv7a-linux-androideabi21-clang) which bakes
+  the target triple in. Upstream NDK sets CMAKE_C_COMPILER to plain clang
+  and puts the target in CMAKE_C_COMPILER_TARGET; ffmpeg's configure only
+  consumes --cc=${CMAKE_C_COMPILER} so the target was lost and clang
+  couldn't create executables during the configure-time test.
+
 v0.2.14
 - Fix Android cross-compile: set CPU as a CACHE var in the toolchain file so
   it survives into dep external_projects. Kodi's HandleDepends.cmake doesn't

@@ -135,17 +135,25 @@ TCEOF
         ;;
     android-armv7)
         echo "  Toolchain: Android NDK ($NDK_PATH) armeabi-v7a"
-        # CPU must be set as a CACHE var inside the toolchain file, because
-        # Kodi's HandleDepends.cmake doesn't include -DCPU=... in BUILD_ARGS
-        # passed to dep external_projects. Without this, ffmpeg's CMakeLists
-        # sees CPU as empty when invoked as a sub-build and falls through to
-        # --cpu=i686 --disable-mmx (incompatible with the ARM clang).
+        # CPU must be set as a CACHE var in the toolchain file because
+        # Kodi's HandleDepends.cmake doesn't forward -DCPU to dep
+        # external_projects.
+        #
+        # CMAKE_C_COMPILER override: NDK r19+ sets CMAKE_C_COMPILER to plain
+        # "clang" and puts the target triple in CMAKE_C_COMPILER_TARGET.
+        # ffmpeg's configure only consumes --cc=${CMAKE_C_COMPILER}, so the
+        # target gets lost and clang fails its "create executable" test.
+        # Use the NDK's per-target wrapper (armv7a-linux-androideabi21-clang)
+        # which bakes the target in.
+        NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
         TOOLCHAIN_FILE="$TOOLCHAIN_DIR/android-armv7.cmake"
         cat > "$TOOLCHAIN_FILE" << TCEOF
 set(ANDROID_ABI armeabi-v7a CACHE STRING "" FORCE)
 set(ANDROID_PLATFORM android-21 CACHE STRING "" FORCE)
 set(CPU armeabi-v7a CACHE STRING "" FORCE)
 include($NDK_PATH/build/cmake/android.toolchain.cmake)
+set(CMAKE_C_COMPILER "$NDK_BIN/armv7a-linux-androideabi21-clang" CACHE FILEPATH "" FORCE)
+set(CMAKE_CXX_COMPILER "$NDK_BIN/armv7a-linux-androideabi21-clang++" CACHE FILEPATH "" FORCE)
 TCEOF
         CMAKE_ARGS+=(
             -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
@@ -154,12 +162,15 @@ TCEOF
         ;;
     android-aarch64)
         echo "  Toolchain: Android NDK ($NDK_PATH) arm64-v8a (wrapper)"
+        NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
         TOOLCHAIN_FILE="$TOOLCHAIN_DIR/android-aarch64.cmake"
         cat > "$TOOLCHAIN_FILE" << TCEOF
 set(ANDROID_ABI arm64-v8a CACHE STRING "" FORCE)
 set(ANDROID_PLATFORM android-21 CACHE STRING "" FORCE)
 set(CPU arm64-v8a CACHE STRING "" FORCE)
 include($NDK_PATH/build/cmake/android.toolchain.cmake)
+set(CMAKE_C_COMPILER "$NDK_BIN/aarch64-linux-android21-clang" CACHE FILEPATH "" FORCE)
+set(CMAKE_CXX_COMPILER "$NDK_BIN/aarch64-linux-android21-clang++" CACHE FILEPATH "" FORCE)
 TCEOF
         CMAKE_ARGS+=(
             -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
