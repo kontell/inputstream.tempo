@@ -4,6 +4,13 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.24
+- Set CPU=arm / CPU=aarch64 in the Linux cross-compile toolchain stubs.
+  Without it, ffmpeg's configure picked the host arch and generated x86
+  assembly ("impossible constraint in asm") when compiled with the ARM
+  gcc. Same CACHE-var trick as the Android stubs so CPU propagates to
+  every dep sub-build.
+
 v0.2.23
 - Restore full release matrix (Linux x86_64/armv7/aarch64 + Android
   armv7/aarch64, each on Kodi 21 Omega and Kodi 22 master). First release

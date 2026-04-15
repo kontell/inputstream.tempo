@@ -116,8 +116,15 @@ set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+# Set CPU in every sub-build so ffmpeg's configure picks the right --arch.
+# Without it, ffmpeg defaults to the host arch (x86_64) and builds x86 asm
+# with the arm gcc, which fails with "impossible constraint in 'asm'".
+set(CPU arm CACHE STRING "" FORCE)
 TCEOF
-        CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE")
+        CMAKE_ARGS+=(
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
+            -DCPU=arm
+        )
         ;;
     linux-aarch64)
         echo "  Toolchain: aarch64-linux-gnu"
@@ -130,8 +137,12 @@ set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CPU aarch64 CACHE STRING "" FORCE)
 TCEOF
-        CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE")
+        CMAKE_ARGS+=(
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
+            -DCPU=aarch64
+        )
         ;;
     android-armv7)
         echo "  Toolchain: Android NDK ($NDK_PATH) armeabi-v7a"
