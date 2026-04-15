@@ -12,9 +12,12 @@ else()
   list(APPEND zvbi_conf CFLAGS=-I${CMAKE_INSTALL_PREFIX}/include)
 endif()
 list(APPEND zvbi_conf LDFLAGS=-L${CMAKE_INSTALL_PREFIX}/lib)
-if ((CORE_SYSTEM_NAME STREQUAL android) OR (CMAKE_CXX_COMPILER MATCHES arm-webos))
-  list(APPEND zvbi_conf LIBS=-liconv)
-endif()
+# libzvbi's configure detects the bundled libiconv.a (built transitively via
+# gmp/libxml2) and generates libiconv_* symbol references, so its utility
+# binaries (zvbi-ntsc-cc, x11font) must link against -liconv. Needed on every
+# platform that builds libzvbi; the previous conditional only covered
+# Android/webOS, which is why fresh Linux hosts failed to link.
+list(APPEND zvbi_conf LIBS=-liconv)
 
 include(ExternalProject)
 externalproject_add(libzvbi

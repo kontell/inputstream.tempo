@@ -17,21 +17,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x86_64
-          - { name: "Linux x86_64 / Kodi 21", os: linux, arch: x86_64, kodi: 21, kodi_branch: Omega }
-          - { name: "Linux x86_64 / Kodi 22", os: linux, arch: x86_64, kodi: 22, kodi_branch: master }
-          # Linux armv7
-          - { name: "Linux armv7 / Kodi 21", os: linux, arch: armv7, kodi: 21, kodi_branch: Omega, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
-          - { name: "Linux armv7 / Kodi 22", os: linux, arch: armv7, kodi: 22, kodi_branch: master, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
-          # Linux aarch64
-          - { name: "Linux aarch64 / Kodi 21", os: linux, arch: aarch64, kodi: 21, kodi_branch: Omega, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
-          - { name: "Linux aarch64 / Kodi 22", os: linux, arch: aarch64, kodi: 22, kodi_branch: master, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
-          # Android armv7
-          - { name: "Android armv7 / Kodi 21", os: android, arch: armv7, kodi: 21, kodi_branch: Omega }
+          # Iterating on Android armv7 / Kodi 22 only.
+          # Add other platforms back once this passes.
           - { name: "Android armv7 / Kodi 22", os: android, arch: armv7, kodi: 22, kodi_branch: master }
-          # Android aarch64
-          - { name: "Android aarch64 / Kodi 21", os: android, arch: aarch64, kodi: 21, kodi_branch: Omega }
-          - { name: "Android aarch64 / Kodi 22", os: android, arch: aarch64, kodi: 22, kodi_branch: master }
+          # Known-good baseline so we always have one passing job to compare against.
+          - { name: "Linux x86_64 / Kodi 22", os: linux, arch: x86_64, kodi: 22, kodi_branch: master }
     name: ${{ matrix.name }}
     steps:
     - name: Checkout addon

@@ -135,11 +135,20 @@ TCEOF
         ;;
     android-armv7)
         echo "  Toolchain: Android NDK ($NDK_PATH) armeabi-v7a"
+        # Kodi's cmake/scripts/android/ArchSetup.cmake expects CPU to be the
+        # NDK ABI string (armeabi-v7a / arm64-v8a / i686 / x86_64). Anything
+        # else and the CPU var is effectively unset for downstream deps —
+        # ffmpeg then falls through to --cpu=i686 --disable-mmx and clang
+        # fails to build because ARM toolchain + x86 flags is incoherent.
+        TOOLCHAIN_FILE="$TOOLCHAIN_DIR/android-armv7.cmake"
+        cat > "$TOOLCHAIN_FILE" << TCEOF
+set(ANDROID_ABI armeabi-v7a CACHE STRING "" FORCE)
+set(ANDROID_PLATFORM android-21 CACHE STRING "" FORCE)
+include($NDK_PATH/build/cmake/android.toolchain.cmake)
+TCEOF
         CMAKE_ARGS+=(
-            -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake"
-            -DANDROID_ABI=armeabi-v7a
-            -DANDROID_PLATFORM=android-21
-            -DCPU=armv7a
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"
+            -DCPU=armeabi-v7a
         )
         ;;
     android-aarch64)
