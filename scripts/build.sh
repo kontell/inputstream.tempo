@@ -229,6 +229,14 @@ case "${TARGET_OS}-${TARGET_ARCH}" in
         ;;
 esac
 
+# Pin pkg-config to our cross-compiled deps dir on any cross target so
+# autoconf configures (e.g. gnutls) don't auto-detect optional host libs
+# (zstd, brotli, etc.) that aren't in the cross include path.
+if [[ -n "${AUTOCONF_HOST:-}" ]]; then
+    export PKG_CONFIG_LIBDIR="$BUILD_DIR/build/depends/lib/pkgconfig"
+    export PKG_CONFIG_PATH="$BUILD_DIR/build/depends/lib/pkgconfig"
+fi
+
 # Build
 echo ""
 echo "=== Building ==="

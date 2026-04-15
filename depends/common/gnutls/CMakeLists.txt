@@ -29,6 +29,8 @@ externalproject_add(gnutls
                       --disable-shared
                       --without-p11-kit
                       --without-idn
+                      --without-zstd
+                      --without-brotli
                       --disable-nls
                       --with-included-unistring
                       --with-included-libtasn1

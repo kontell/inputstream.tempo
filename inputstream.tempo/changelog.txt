@@ -4,6 +4,14 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.22
+- Disable gnutls zstd+brotli compression support (--without-zstd/brotli).
+  Configure auto-detected the host system's zstd.pc and enabled the code,
+  but the vendored fallback header doesn't define ZSTD_CLEVEL_DEFAULT so
+  the cross-compile failed.
+- Also pin PKG_CONFIG_LIBDIR/PATH to the cross-built deps dir globally so
+  other autoconf deps don't auto-pick-up host-system libs.
+
 v0.2.21
 - Pass --host=<triplet> to autoconf-based deps (gmp, gnutls, iconv, libzvbi,
   nettle). v0.2.20 got the cross-compiler into autoconf via CC= env, but
