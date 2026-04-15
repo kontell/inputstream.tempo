@@ -1,24 +1,45 @@
 """Speed control commands for inputstream.tempo. Called via RunScript.
 
-Supports two modes:
-- Preset mode (default): steps through SPEED_PRESETS list
-- Increment mode: if a step file exists, steps by that increment value
+Commands:
+    speed_up     bump tempo by one step, clamped to max
+    speed_down   drop tempo by one step, clamped to min
+    speed_reset  set tempo to 1.0x
+    dialog       show a picker dialog of all stepped values from min to max
 
-The step file is written by the calling addon (e.g. KoShelf) at:
-  special://temp/inputstream_tempo_step
-containing a single float like "0.1"
+Config is read from special://temp/inputstream_tempo_config (JSON with keys
+step, min, max), written by the calling addon (e.g. KoShelf). Defaults are
+used if the file is missing.
 """
 
+import json
 import sys
+import time
 
-import xbmc
 import xbmcgui
+import xbmcvfs
 
-SPEED_PRESETS = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0]
-TEMPO_FILE = xbmc.translatePath('special://temp/inputstream_tempo')
-STEP_FILE = xbmc.translatePath('special://temp/inputstream_tempo_step')
-MIN_SPEED = 0.5
-MAX_SPEED = 3.5
+TEMPO_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo')
+CONFIG_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_config')
+NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
+
+DEFAULT_STEP = 0.10
+DEFAULT_MIN = 0.5
+DEFAULT_MAX = 5.0
+
+
+def read_config():
+    try:
+        with open(CONFIG_FILE) as f:
+            cfg = json.load(f)
+        step = float(cfg.get('step', DEFAULT_STEP))
+        lo = float(cfg.get('min', DEFAULT_MIN))
+        hi = float(cfg.get('max', DEFAULT_MAX))
+    except (IOError, ValueError, TypeError):
+        step, lo, hi = DEFAULT_STEP, DEFAULT_MIN, DEFAULT_MAX
+    # Guard against bad data — must have a usable range and positive step.
+    if step <= 0 or lo > hi:
+        step, lo, hi = DEFAULT_STEP, DEFAULT_MIN, DEFAULT_MAX
+    return step, lo, hi
 
 
 def read_tempo():
@@ -34,68 +55,67 @@ def write_tempo(val):
         f.write(str(val))
 
 
-def read_step():
-    """Read custom step increment. Returns None if not set (use presets)."""
-    try:
-        with open(STEP_FILE) as f:
-            step = float(f.read().strip())
-            if 0.01 <= step <= 0.5:
-                return step
-    except Exception:
-        pass
-    return None
-
-
 def set_props(speed):
     win = xbmcgui.Window(10000)
     win.setProperty('InputstreamTempo.Speed', str(speed))
-    # Show 2 decimal places for fine increments, 1 for round values
+    win.setProperty('InputstreamTempo.SpeedDisplay', format_speed(speed))
+
+
+def format_speed(speed):
+    # Show 2dp only when needed (e.g. 1.15x), else single dp (e.g. 1.5x).
     if abs(speed - round(speed, 1)) < 0.001:
-        display = '{:.1f}x'.format(speed)
-    else:
-        display = '{:.2f}x'.format(speed)
-    win.setProperty('InputstreamTempo.SpeedDisplay', display)
+        return '{:.1f}x'.format(speed)
+    return '{:.2f}x'.format(speed)
 
 
-def find_nearest_index(value):
-    return min(range(len(SPEED_PRESETS)), key=lambda i: abs(SPEED_PRESETS[i] - value))
+def stepped_values(lo, hi, step):
+    """Return the list of values from lo to hi (inclusive) in step increments."""
+    # Snap hi down to the nearest step boundary from lo so the list ends cleanly.
+    count = int(round((hi - lo) / step))
+    return [round(lo + i * step, 2) for i in range(count + 1)]
 
 
-def step_with_presets(cmd, current):
-    idx = find_nearest_index(current)
-    if cmd == 'speed_up' and idx < len(SPEED_PRESETS) - 1:
-        return SPEED_PRESETS[idx + 1]
-    elif cmd == 'speed_down' and idx > 0:
-        return SPEED_PRESETS[idx - 1]
-    return current
-
-
-def step_with_increment(cmd, current, step):
+def step_tempo(cmd, current, lo, hi, step):
     if cmd == 'speed_up':
-        return min(round(current + step, 2), MAX_SPEED)
-    elif cmd == 'speed_down':
-        return max(round(current - step, 2), MIN_SPEED)
+        return round(min(current + step, hi), 2)
+    if cmd == 'speed_down':
+        return round(max(current - step, lo), 2)
     return current
+
+
+def pick_via_dialog(current, lo, hi, step):
+    values = stepped_values(lo, hi, step)
+    labels = [format_speed(v) for v in values]
+    # Preselect the nearest listed value.
+    idx = min(range(len(values)), key=lambda i: abs(values[i] - current))
+    sel = xbmcgui.Dialog().select('Playback speed', labels, preselect=idx)
+    if sel < 0:
+        return current
+    return values[sel]
+
+
+def queue_notification(display):
+    # runner.py debounces and emits the actual toast.
+    try:
+        with open(NOTIFY_FILE, 'w') as f:
+            f.write('{}|{}'.format(time.time(), display))
+    except IOError:
+        pass
 
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else ''
+    step, lo, hi = read_config()
     current = read_tempo()
 
     if cmd == 'speed_reset':
-        new_speed = 1.0
+        new_speed = round(max(lo, min(hi, 1.0)), 2)
+    elif cmd == 'dialog':
+        new_speed = pick_via_dialog(current, lo, hi, step)
     else:
-        step = read_step()
-        if step is not None:
-            new_speed = step_with_increment(cmd, current, step)
-        else:
-            new_speed = step_with_presets(cmd, current)
+        new_speed = step_tempo(cmd, current, lo, hi, step)
 
     if abs(new_speed - current) > 0.001:
         write_tempo(new_speed)
         set_props(new_speed)
-        if abs(new_speed - round(new_speed, 1)) < 0.001:
-            display = '{:.1f}x'.format(new_speed)
-        else:
-            display = '{:.2f}x'.format(new_speed)
-        xbmc.executebuiltin('Notification(Playback Speed, {}, 1500)'.format(display))
+        queue_notification(format_speed(new_speed))
