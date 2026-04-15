@@ -4,6 +4,14 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.2.18
+- ffmpeg configure is now launched via a generated wrapper script that
+  explicitly exports PKG_CONFIG_PATH / PKG_CONFIG_LIBDIR and prints a
+  diagnostic dump first. Previous cmake-level attempts (bash-style VAR=val
+  prefix, then `cmake -E env VAR=val ...`) didn't reliably propagate the
+  env vars to the configure script's child pkg-config invocation in
+  cross-compile contexts.
+
 v0.2.17
 - Also set PKG_CONFIG_LIBDIR for ffmpeg configure, not just PKG_CONFIG_PATH.
   On Ubuntu CI runners the host system has gnutls.pc at the default pkg-

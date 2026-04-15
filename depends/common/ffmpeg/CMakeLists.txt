@@ -144,12 +144,32 @@ if(NOT WIN32)
   # runner), PKG_CONFIG_PATH alone lets pkg-config fall back to host libs
   # which the cross-linker can't resolve, so ffmpeg fails its gnutls
   # compile-test. LIBDIR pins pkg-config to the cross-built dir only.
+  # Write a tiny wrapper that sets pkg-config env explicitly, prints it for
+  # debugging, then execs the real configure. Avoids the fragility of trying
+  # to prefix env vars inside a CMake list command.
+  set(FFMPEG_CONFIGURE_WRAPPER ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg-configure-wrapper.sh)
+  file(WRITE ${FFMPEG_CONFIGURE_WRAPPER}
+"#!/bin/bash
+set -e
+export PKG_CONFIG_PATH='${CMAKE_INSTALL_PREFIX}/lib/pkgconfig'
+export PKG_CONFIG_LIBDIR='${CMAKE_INSTALL_PREFIX}/lib/pkgconfig'
+echo '=== ffmpeg configure env ==='
+echo \"PKG_CONFIG_PATH=$PKG_CONFIG_PATH\"
+echo \"PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR\"
+echo '--- pkgconfig dir contents:'
+ls -la \"$PKG_CONFIG_LIBDIR\" 2>&1 | head -20 || true
+echo '--- pkg-config gnutls probe:'
+pkg-config --exists gnutls && echo GNUTLS_FOUND || echo GNUTLS_NOT_FOUND
+pkg-config --cflags gnutls 2>&1 || true
+pkg-config --libs gnutls 2>&1 || true
+echo '=== end debug, running configure ==='
+exec '${CMAKE_SOURCE_DIR}/configure' \"$@\"
+")
+  execute_process(COMMAND chmod +x ${FFMPEG_CONFIGURE_WRAPPER})
+
   externalproject_add(ffmpeg
                       SOURCE_DIR ${CMAKE_SOURCE_DIR}
-                      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
-                        "PKG_CONFIG_PATH=${CMAKE_INSTALL_PREFIX}/lib/pkgconfig"
-                        "PKG_CONFIG_LIBDIR=${CMAKE_INSTALL_PREFIX}/lib/pkgconfig"
-                        ${CMAKE_SOURCE_DIR}/configure
+                      CONFIGURE_COMMAND ${FFMPEG_CONFIGURE_WRAPPER}
                         --prefix=${CMAKE_INSTALL_PREFIX}
                         --enable-pthreads
                         --enable-gnutls
