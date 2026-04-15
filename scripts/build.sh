@@ -188,6 +188,43 @@ echo ""
 echo "=== Configuring ==="
 cmake "${CMAKE_ARGS[@]}" "$KODI_SRC/cmake/addons"
 
+# Export cross-compiler env vars for autoconf-based deps (gnutls, nettle,
+# gmp, iconv, libzvbi, bz2, xz-utils). Their CMakeLists.txt invokes
+# <SOURCE_DIR>/configure without passing CC=, so without this they would
+# autoconf-detect the host gcc and produce x86_64 .a files that the cross
+# linker then rejects with "incompatible with armelf_linux_eabi". CMake-
+# based deps already use our toolchain file and ignore these env vars.
+case "${TARGET_OS}-${TARGET_ARCH}" in
+    android-armv7)
+        export CC="$NDK_BIN/armv7a-linux-androideabi21-clang"
+        export CXX="$NDK_BIN/armv7a-linux-androideabi21-clang++"
+        export AR="$NDK_BIN/llvm-ar"
+        export STRIP="$NDK_BIN/llvm-strip"
+        export RANLIB="$NDK_BIN/llvm-ranlib"
+        ;;
+    android-aarch64)
+        export CC="$NDK_BIN/aarch64-linux-android21-clang"
+        export CXX="$NDK_BIN/aarch64-linux-android21-clang++"
+        export AR="$NDK_BIN/llvm-ar"
+        export STRIP="$NDK_BIN/llvm-strip"
+        export RANLIB="$NDK_BIN/llvm-ranlib"
+        ;;
+    linux-armv7)
+        export CC=arm-linux-gnueabihf-gcc
+        export CXX=arm-linux-gnueabihf-g++
+        export AR=arm-linux-gnueabihf-ar
+        export STRIP=arm-linux-gnueabihf-strip
+        export RANLIB=arm-linux-gnueabihf-ranlib
+        ;;
+    linux-aarch64)
+        export CC=aarch64-linux-gnu-gcc
+        export CXX=aarch64-linux-gnu-g++
+        export AR=aarch64-linux-gnu-ar
+        export STRIP=aarch64-linux-gnu-strip
+        export RANLIB=aarch64-linux-gnu-ranlib
+        ;;
+esac
+
 # Build
 echo ""
 echo "=== Building ==="
