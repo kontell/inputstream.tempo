@@ -2953,12 +2953,16 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
         outPkt->iSize = pcmSize;
         outPkt->iStreamId = stream->index;
 
-        // Compute timestamps based on output sample count
-        double duration = (double)m_filteredFrame->nb_samples / m_audioDecoderCtx->sample_rate;
+        // Compute timestamps in CONTENT time, not output (wall-clock) time.
+        // The atempo filter produces fewer samples for speedup, so raw output
+        // duration = nb_samples/rate advances too slowly. Scale by tempo so
+        // GetTime() and sync report the content position correctly.
+        double outputDuration = (double)m_filteredFrame->nb_samples / m_audioDecoderCtx->sample_rate;
+        double contentDuration = outputDuration * m_currentTempo;
         outPkt->pts = m_tempoOutputPts;
         outPkt->dts = m_tempoOutputPts;
-        outPkt->duration = STREAM_SEC_TO_TIME(duration);
-        m_tempoOutputPts += STREAM_SEC_TO_TIME(duration);
+        outPkt->duration = STREAM_SEC_TO_TIME(contentDuration);
+        m_tempoOutputPts += STREAM_SEC_TO_TIME(contentDuration);
 
         outPkt->demuxerId = m_demuxerId;
         m_tempoOutputQueue.push(outPkt);
