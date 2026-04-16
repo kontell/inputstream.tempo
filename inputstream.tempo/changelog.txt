@@ -1,22 +1,22 @@
-v0.2.12
-- Fix Linux build: add -liconv to libzvbi LIBS on all platforms where libzvbi
-  is built (previously only Android/webOS). The CI runner's fresh host failed
-  to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
-  by gmp/libxml2) was detected but not linked.
-
 v0.3.0
-- Keymap: switch from square brackets to PgUp/PgDn for speed up/down
-  (overrides rating increase/decrease in Visualisation, which is niche).
-- Add start_time property (inputstream.tempo.start_time): the calling addon
-  sets the resume position in seconds and the C++ side seeks during Open()
-  before returning any packets. Eliminates the brief audible playback from
-  position 0 that the Python seek hack produced.
-- Improve OSD duration accuracy: GetTotalTime() now prefers the audio
-  stream's own duration over the container duration when tempo processing
-  is active. Container duration can include trailing metadata the audio
-  codec never reaches, making "time remaining" freeze before zero.
-- Add DemuxAbort() call in TimeshiftStream::Close() to prevent potential
-  deadlock when the input thread is blocked on a demux read during close.
+- Keymap: PgUp/PgDn for speed up/down (replaces square brackets).
+- start_time property: pre-sets m_currentPts so GetTime() returns the
+  resume position immediately. Actual seeking is handled by PAPlayer's
+  native audiobook_bookmark mechanism (set by the calling addon).
+- Tempo PTS tracking: m_currentPts now updated from tempo output packets
+  in DemuxRead (was missing — only the non-tempo path updated it).
+  m_tempoSeekPending anchors output PTS to the actual seek landing.
+- Faster stream open: analyzeduration=0.5s, probesize=128KB for tempo
+  streams (was FFmpeg default 5s/5MB).
+- OSD duration: GetTotalTime() prefers audio stream duration over container
+  duration when tempo is active.
+- Source audio info: OSD shows source bitrate/bitsPerSample instead of
+  PCM float values. Codec name stays pcm_f32le (needed by Kodi decoder).
+- Speed display always uses two decimal places (1.25x not 1.2x).
+- DemuxAbort() in TimeshiftStream::Close() prevents deadlock.
+- libzvbi: iconv added as explicit dep + unconditional LIBS=-liconv.
+- Cross-compile fixes for all 10 platform targets (Linux x86_64/armv7/
+  aarch64, Android armv7/aarch64, each Kodi 21+22).
 
 v0.2.24
 - Set CPU=arm / CPU=aarch64 in the Linux cross-compile toolchain stubs.
