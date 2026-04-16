@@ -6,6 +6,12 @@ This is a fork of inputstream.ffmpegdirect.
 
 The purpose of the fork is to add tempo (playback speed adjustment) for audio playback using PAPlayer.
 
-It works, however seeking is not available in the player.
+# Status
 
-See https://github.com/xbmc/xbmc/pull/28179 for a proposed fix.
+It works, however seeking is not available in the player without this fix: https://github.com/xbmc/xbmc/pull/28179.
+
+Will also need this patch to enable correct progress display in PAPlayer: https://github.com/xbmc/xbmc/compare/master...kontell:xbmc:fix/paplayer-display-time
+
+An audiobookshelf addon is working quite well with it: https://github.com/kontell/KoShelf
+
+I patched the youtube addon to use inputstream.tempo for the pre-existing audio-only playback and it worked fine, excluding progress display: https://github.com/anxdpanic/plugin.video.youtube/compare/master...kontell:plugin.video.youtube:tempo
