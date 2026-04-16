@@ -67,9 +67,6 @@ def set_props(speed):
 
 
 def format_speed(speed):
-    # Show 2dp only when needed (e.g. 1.15x), else single dp (e.g. 1.5x).
-    if abs(speed - round(speed, 1)) < 0.001:
-        return '{:.1f}x'.format(speed)
     return '{:.2f}x'.format(speed)
 
 

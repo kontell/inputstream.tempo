@@ -110,7 +110,7 @@ def run():
         if active:
             tempo = read_tempo()
             win.setProperty('InputstreamTempo.Speed', str(tempo))
-            win.setProperty('InputstreamTempo.SpeedDisplay', '{:.1f}x'.format(tempo))
+            win.setProperty('InputstreamTempo.SpeedDisplay', '{:.2f}x'.format(tempo))
             win.setProperty('InputstreamTempo.Active', 'true')
             was_playing = True
         elif was_playing:

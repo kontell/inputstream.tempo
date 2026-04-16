@@ -4,6 +4,20 @@ v0.2.12
   to link zvbi-ntsc-cc and x11font because the bundled libiconv.a (pulled in
   by gmp/libxml2) was detected but not linked.
 
+v0.3.0
+- Keymap: switch from square brackets to PgUp/PgDn for speed up/down
+  (overrides rating increase/decrease in Visualisation, which is niche).
+- Add start_time property (inputstream.tempo.start_time): the calling addon
+  sets the resume position in seconds and the C++ side seeks during Open()
+  before returning any packets. Eliminates the brief audible playback from
+  position 0 that the Python seek hack produced.
+- Improve OSD duration accuracy: GetTotalTime() now prefers the audio
+  stream's own duration over the container duration when tempo processing
+  is active. Container duration can include trailing metadata the audio
+  codec never reaches, making "time remaining" freeze before zero.
+- Add DemuxAbort() call in TimeshiftStream::Close() to prevent potential
+  deadlock when the input thread is blocked on a demux read during close.
+
 v0.2.24
 - Set CPU=arm / CPU=aarch64 in the Linux cross-compile toolchain stubs.
   Without it, ffmpeg's configure picked the host arch and generated x86

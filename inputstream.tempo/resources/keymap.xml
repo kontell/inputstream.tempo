@@ -9,31 +9,31 @@
      no-ops during non-tempo playback.
 
      Keys:
-       [   speed down one step
-       ]   speed up   one step
-       =   reset to 1.0x
-       s   open the speed picker dialog -->
+       PgDn   speed down one step
+       PgUp   speed up   one step
+       =      reset to 1.0x
+       s      open the speed picker dialog -->
 <keymap>
   <FullscreenVideo>
     <keyboard>
-      <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
-      <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
+      <pagedown>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</pagedown>
+      <pageup>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</pageup>
       <equals>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</equals>
       <s>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</s>
     </keyboard>
   </FullscreenVideo>
   <Visualisation>
     <keyboard>
-      <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
-      <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
+      <pagedown>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</pagedown>
+      <pageup>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</pageup>
       <equals>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</equals>
       <s>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</s>
     </keyboard>
   </Visualisation>
   <MusicOSD>
     <keyboard>
-      <opensquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</opensquarebracket>
-      <closesquarebracket>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</closesquarebracket>
+      <pagedown>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_down)</pagedown>
+      <pageup>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_up)</pageup>
       <equals>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,speed_reset)</equals>
       <s>RunScript(special://home/addons/inputstream.tempo/resources/lib/speed.py,dialog)</s>
     </keyboard>

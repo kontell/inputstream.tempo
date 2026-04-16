@@ -37,6 +37,7 @@ static const std::string DEFAULT_PROGRAMME_DURATION = "inputstream.tempo.default
 static const std::string PROGRAMME_CATCHUP_ID = "inputstream.tempo.programme_catchup_id";
 static const std::string AUDIO_TEMPO = "inputstream.tempo.tempo";
 static const std::string AUDIO_TEMPO_FILE = "inputstream.tempo.tempo_file";
+static const std::string AUDIO_START_TIME = "inputstream.tempo.start_time";
 
 class ATTR_DLL_LOCAL InputStreamFFmpegDirect
   : public kodi::addon::CInstanceInputStream, ffmpegdirect::IManageDemuxPacket

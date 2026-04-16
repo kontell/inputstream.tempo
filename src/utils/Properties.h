@@ -52,5 +52,6 @@ namespace ffmpegdirect
 
     double m_audioTempo = 1.0;
     std::string m_tempoFilePath;
+    double m_startTimeSecs = 0.0;
   };
 } //namespace ffmpegdirect

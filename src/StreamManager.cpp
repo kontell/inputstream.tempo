@@ -162,6 +162,10 @@ bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props
     {
       m_properties.m_tempoFilePath = prop.second;
     }
+    else if (AUDIO_START_TIME == prop.first)
+    {
+      m_properties.m_startTimeSecs = std::stod(prop.second);
+    }
   }
 
   m_streamUrl = props.GetURL();

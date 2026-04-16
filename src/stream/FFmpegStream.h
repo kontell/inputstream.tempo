@@ -211,6 +211,8 @@ private:
   bool m_tempoEnabled = false;
   double m_currentTempo = 1.0;
   std::string m_tempoFilePath;
+  double m_initialSeekTimeSecs = 0.0;
+  bool m_initialSeekDone = false;
   int m_tempoAudioStreamIndex = -1;
 
   AVCodecContext* m_audioDecoderCtx = nullptr;

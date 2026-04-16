@@ -78,6 +78,7 @@ bool TimeshiftStream::Start()
 void TimeshiftStream::Close()
 {
   m_running = false;
+  DemuxAbort();
   if (m_inputThread.joinable())
     m_inputThread.join();
 

@@ -160,9 +160,12 @@ FFmpegStream::FFmpegStream(IManageDemuxPacket* demuxPacketManager, const Propert
   // Tempo processing
   m_currentTempo = props.m_audioTempo;
   m_tempoFilePath = props.m_tempoFilePath;
+  m_initialSeekTimeSecs = props.m_startTimeSecs;
   m_tempoEnabled = (m_currentTempo != 1.0 || !m_tempoFilePath.empty());
   if (m_tempoEnabled)
     Log(LOGLEVEL_INFO, "Tempo processing enabled: %.2fx (file: %s)", m_currentTempo, m_tempoFilePath.c_str());
+  if (m_initialSeekTimeSecs > 0)
+    Log(LOGLEVEL_INFO, "Start time property: %.1fs", m_initialSeekTimeSecs);
 }
 
 FFmpegStream::~FFmpegStream()
@@ -190,6 +193,22 @@ bool FFmpegStream::Open(const std::string& streamUrl, const std::string& mimeTyp
   {
     FFmpegLog::SetEnabled(true);
     av_dump_format(m_pFormatContext, 0, CURL::GetRedacted(streamUrl).c_str(), 0);
+
+    // Seek to the caller-provided start position before the first DemuxRead.
+    // This avoids the brief audible playback from position 0 that happens when
+    // the seek is driven from Python (which can't act until after audio begins).
+    if (m_initialSeekTimeSecs > 0 && !m_initialSeekDone)
+    {
+      double startMs = m_initialSeekTimeSecs * 1000.0;
+      double startPts = 0;
+      DemuxSeekTime(startMs, false, startPts);
+      // Set m_currentPts immediately so GetTime() returns the seek position
+      // before the first DemuxRead. Without this, the OSD shows 0:00 and
+      // skip operations work relative to 0 instead of the real position.
+      m_currentPts = STREAM_MSEC_TO_TIME(startMs);
+      m_initialSeekDone = true;
+      Log(LOGLEVEL_INFO, "Initial seek to %.1fs from start_time property", m_initialSeekTimeSecs);
+    }
   }
   FFmpegLog::SetEnabled(kodi::addon::GetSettingBoolean("allowFFmpegLogging"));
 
@@ -626,6 +645,16 @@ void FFmpegStream::SetVideoResolution(unsigned int width, unsigned int height)
 
 int FFmpegStream::GetTotalTime()
 {
+  // Prefer the audio stream's own duration when tempo is active — container
+  // duration can include trailing metadata that the audio codec never reaches,
+  // making the OSD show "time remaining" that never counts down to zero.
+  if (m_tempoEnabled && m_tempoAudioStreamIndex >= 0 &&
+      m_tempoAudioStreamIndex < static_cast<int>(m_pFormatContext->nb_streams))
+  {
+    AVStream* st = m_pFormatContext->streams[m_tempoAudioStreamIndex];
+    if (st && st->duration > 0 && st->time_base.den > 0)
+      return static_cast<int>(av_rescale_q(st->duration, st->time_base, {1, 1000}));
+  }
   if (m_pFormatContext->duration)
     return static_cast<int>(m_pFormatContext->duration / AV_TIME_BASE * 1000);
   else
@@ -832,6 +861,16 @@ bool FFmpegStream::Open(bool fileinfo)
   m_bMatroska = strncmp(m_pFormatContext->iformat->name, "matroska", 8) == 0;	// for "matroska.webm"
   m_bAVI = strcmp(m_pFormatContext->iformat->name, "avi") == 0;
   m_bSup = strcmp(m_pFormatContext->iformat->name, "sup") == 0;
+
+  // For tempo-enabled streams (audiobooks, podcasts), the container header
+  // already contains all codec parameters. FFmpeg's default analyzeduration
+  // (5 seconds of content) and probesize (5 MB) are wildly excessive for a
+  // single-stream audio file and account for ~8s of unnecessary startup delay.
+  if (m_tempoEnabled)
+  {
+    av_opt_set_int(m_pFormatContext, "analyzeduration", 0, 0);
+    av_opt_set_int(m_pFormatContext, "probesize", 32768, 0);
+  }
 
   if (m_streaminfo)
   {
@@ -2017,12 +2056,16 @@ DemuxStream* FFmpegStream::AddStream(int streamIdx)
         if (av_dict_get(pStream->metadata, "title", NULL, 0))
           st->m_description = av_dict_get(pStream->metadata, "title", NULL, 0)->value;
 
-        // Init or preserve tempo processing for the audio stream
+        // Init or preserve tempo processing for the audio stream.
+        // Save source codec info for OSD display before overriding to PCM.
         if (m_tempoEnabled && m_tempoAudioStreamIndex < 0)
         {
           if (InitTempoProcessing(pStream))
           {
             st->m_tempoActive = true;
+            st->m_sourceCodecName = avcodec_get_name(pStream->codecpar->codec_id);
+            st->m_sourceBitRate = pStream->codecpar->bit_rate;
+            st->m_sourceBitsPerSample = pStream->codecpar->bits_per_coded_sample;
             st->codec = AV_CODEC_ID_PCM_F32LE;
             st->iBitsPerSample = 32;
             st->iBlockAlign = codecparChannels * 4;
@@ -2031,8 +2074,10 @@ DemuxStream* FFmpegStream::AddStream(int streamIdx)
         }
         else if (m_tempoEnabled && pStream->index == m_tempoAudioStreamIndex)
         {
-          // Stream recreated (e.g. by codec mismatch check) — preserve tempo override
           st->m_tempoActive = true;
+          st->m_sourceCodecName = avcodec_get_name(pStream->codecpar->codec_id);
+          st->m_sourceBitRate = pStream->codecpar->bit_rate;
+          st->m_sourceBitsPerSample = pStream->codecpar->bits_per_coded_sample;
           st->codec = AV_CODEC_ID_PCM_F32LE;
           st->iBitsPerSample = 32;
           st->iBlockAlign = codecparChannels * 4;

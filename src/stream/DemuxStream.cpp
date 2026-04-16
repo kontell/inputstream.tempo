@@ -170,14 +170,16 @@ bool DemuxStreamAudioFFmpeg::GetInformation(kodi::addon::InputstreamInfo& info)
 
   if (m_tempoActive)
   {
-    // Override codec to PCM float — tempo-processed audio is decoded
+    // Codec name must stay as pcm_f32le — Kodi uses it to select the audio
+    // decoder pipeline, and our output IS raw PCM float. But report the SOURCE
+    // bitrate and bits-per-sample so the OSD doesn't show huge PCM numbers.
     info.SetCodecName("pcm_f32le");
     info.SetExtraData(nullptr, 0);
     info.SetChannels(iChannels);
     info.SetSampleRate(iSampleRate);
-    info.SetBitsPerSample(32);
+    info.SetBitsPerSample(m_sourceBitsPerSample > 0 ? m_sourceBitsPerSample : 32);
     info.SetBlockAlign(iChannels * 4);
-    info.SetBitRate(iSampleRate * iChannels * 32);
+    info.SetBitRate(m_sourceBitRate > 0 ? m_sourceBitRate : iSampleRate * iChannels * 32);
   }
   else
   {
