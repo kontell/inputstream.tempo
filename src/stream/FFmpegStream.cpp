@@ -194,21 +194,11 @@ bool FFmpegStream::Open(const std::string& streamUrl, const std::string& mimeTyp
     FFmpegLog::SetEnabled(true);
     av_dump_format(m_pFormatContext, 0, CURL::GetRedacted(streamUrl).c_str(), 0);
 
-    // Seek to the caller-provided start position before the first DemuxRead.
-    // This avoids the brief audible playback from position 0 that happens when
-    // the seek is driven from Python (which can't act until after audio begins).
-    if (m_initialSeekTimeSecs > 0 && !m_initialSeekDone)
-    {
-      double startMs = m_initialSeekTimeSecs * 1000.0;
-      double startPts = 0;
-      DemuxSeekTime(startMs, false, startPts);
-      // Set m_currentPts immediately so GetTime() returns the seek position
-      // before the first DemuxRead. Without this, the OSD shows 0:00 and
-      // skip operations work relative to 0 instead of the real position.
-      m_currentPts = STREAM_MSEC_TO_TIME(startMs);
-      m_initialSeekDone = true;
-      Log(LOGLEVEL_INFO, "Initial seek to %.1fs from start_time property", m_initialSeekTimeSecs);
-    }
+    // Pre-set m_currentPts so GetTime() returns the resume position before
+    // the calling addon's Python seek lands via onAVStarted. No actual seek
+    // here — PAPlayer's init overwrites any seek we do during Open().
+    if (m_initialSeekTimeSecs > 0)
+      m_currentPts = STREAM_MSEC_TO_TIME(m_initialSeekTimeSecs * 1000.0);
   }
   FFmpegLog::SetEnabled(kodi::addon::GetSettingBoolean("allowFFmpegLogging"));
 
@@ -472,6 +462,15 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
           {
             pPacket = m_tempoOutputQueue.front();
             m_tempoOutputQueue.pop();
+
+            // Update m_currentPts from tempo output — same logic as the
+            // non-tempo path. Without this, GetTime() never advances and the
+            // post-seek wait loop always times out.
+            if (pPacket->dts != STREAM_NOPTS_VALUE &&
+                (pPacket->dts > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE))
+            {
+              m_currentPts = pPacket->dts;
+            }
           }
           else
           {
@@ -865,11 +864,12 @@ bool FFmpegStream::Open(bool fileinfo)
   // For tempo-enabled streams (audiobooks, podcasts), the container header
   // already contains all codec parameters. FFmpeg's default analyzeduration
   // (5 seconds of content) and probesize (5 MB) are wildly excessive for a
-  // single-stream audio file and account for ~8s of unnecessary startup delay.
+  // single-stream audio file. But analyzeduration=0 breaks MP3 VBR seeking
+  // (no seek table is built), so use a small but non-zero value.
   if (m_tempoEnabled)
   {
-    av_opt_set_int(m_pFormatContext, "analyzeduration", 0, 0);
-    av_opt_set_int(m_pFormatContext, "probesize", 32768, 0);
+    av_opt_set_int(m_pFormatContext, "analyzeduration", 500000, 0);  // 0.5s
+    av_opt_set_int(m_pFormatContext, "probesize", 131072, 0);        // 128KB
   }
 
   if (m_streaminfo)
@@ -1511,7 +1511,10 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
     hitEnd = true;
   }
 
-  // Reset tempo pipeline on seek (no graph rebuild — just flush and set PTS)
+  // Reset tempo pipeline on seek. Set m_tempoSeekPending so the first raw
+  // audio packet after seek initialises m_tempoOutputPts from its actual DTS
+  // (av_seek_frame may land at a different position than requested, especially
+  // for MP3 VBR).
   if (m_tempoEnabled && m_audioDecoderCtx)
   {
     avcodec_flush_buffers(m_audioDecoderCtx);
@@ -1520,7 +1523,7 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
       m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
       m_tempoOutputQueue.pop();
     }
-    m_tempoOutputPts = STREAM_MSEC_TO_TIME(time);
+    m_tempoSeekPending = true;
   }
 
   m_pkt.result = -1;
@@ -2916,6 +2919,16 @@ void FFmpegStream::CheckTempoFileUpdate()
 
 void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
 {
+  // After a seek, anchor m_tempoOutputPts to the raw packet's actual DTS so
+  // the output PTS reflects where av_seek_frame really landed, not where we
+  // requested. Critical for MP3 VBR where seeks can be imprecise.
+  if (m_tempoSeekPending && pkt->dts != AV_NOPTS_VALUE)
+  {
+    double actualPts = ConvertTimestamp(pkt->dts, stream->time_base.den, stream->time_base.num);
+    m_tempoOutputPts = actualPts;
+    m_tempoSeekPending = false;
+  }
+
   int ret = avcodec_send_packet(m_audioDecoderCtx, pkt);
   if (ret < 0 && ret != AVERROR(EAGAIN))
     return;
