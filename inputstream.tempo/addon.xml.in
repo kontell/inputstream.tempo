@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="0.3.1"
+  version="0.3.2"
   name="Inputstream Tempo"
   provider-name="konell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with audio tempo control (pitch-corrected playback speed)</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in audio tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts. Based on inputstream.ffmpegdirect.</description>
-    <news>v0.3.1 Fix OSD progress at non-1x tempo — PTS now advances by content time, not output time, so current position and progress bar track correctly.</news>
+    <news>v0.3.2 Fix audio glitching under VideoPlayer at non-1x tempo — split packet PTS (output/wall-clock time, for ActiveAE) from content PTS (in dispTime/GetTime, for OSD and resume).</news>
   </extension>
 </addon>

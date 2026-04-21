@@ -301,6 +301,7 @@ void FFmpegStream::DemuxFlush()
       m_tempoOutputQueue.pop();
     }
     m_tempoOutputPts = 0.0;
+    m_tempoContentPts = 0.0;
   }
 
   m_currentPts = STREAM_NOPTS_VALUE;
@@ -463,13 +464,13 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
             pPacket = m_tempoOutputQueue.front();
             m_tempoOutputQueue.pop();
 
-            // Update m_currentPts from tempo output — same logic as the
-            // non-tempo path. Without this, GetTime() never advances and the
-            // post-seek wait loop always times out.
-            if (pPacket->dts != STREAM_NOPTS_VALUE &&
-                (pPacket->dts > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE))
+            // m_currentPts drives GetTime(), which PAPlayer polls for
+            // content position. pts/dts on tempo packets are output time
+            // (for ActiveAE sync), so read content time from dispTime.
+            double contentPts = STREAM_MSEC_TO_TIME(pPacket->dispTime);
+            if (contentPts > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE)
             {
-              m_currentPts = pPacket->dts;
+              m_currentPts = contentPts;
             }
           }
           else
@@ -2919,13 +2920,14 @@ void FFmpegStream::CheckTempoFileUpdate()
 
 void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
 {
-  // After a seek, anchor m_tempoOutputPts to the raw packet's actual DTS so
-  // the output PTS reflects where av_seek_frame really landed, not where we
+  // After a seek, anchor both PTS streams to the raw packet's actual DTS so
+  // downstream state reflects where av_seek_frame really landed, not where we
   // requested. Critical for MP3 VBR where seeks can be imprecise.
   if (m_tempoSeekPending && pkt->dts != AV_NOPTS_VALUE)
   {
     double actualPts = ConvertTimestamp(pkt->dts, stream->time_base.den, stream->time_base.num);
     m_tempoOutputPts = actualPts;
+    m_tempoContentPts = actualPts;
     m_tempoSeekPending = false;
   }
 
@@ -2953,16 +2955,20 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
         outPkt->iSize = pcmSize;
         outPkt->iStreamId = stream->index;
 
-        // Compute timestamps in CONTENT time, not output (wall-clock) time.
-        // The atempo filter produces fewer samples for speedup, so raw output
-        // duration = nb_samples/rate advances too slowly. Scale by tempo so
-        // GetTime() and sync report the content position correctly.
+        // Two time streams. ActiveAE schedules audio off packet pts/dts
+        // against the wall-clock sample drain, so pts/dts/duration must
+        // advance at OUTPUT rate (nb_samples/sample_rate), or it accumulates
+        // a huge sync error and hard-resyncs (audible glitch) at non-1x
+        // tempo. The OSD and GetTime() want CONTENT position, so we carry
+        // that in dispTime and m_currentPts (via the queue-pop path).
         double outputDuration = (double)m_filteredFrame->nb_samples / m_audioDecoderCtx->sample_rate;
         double contentDuration = outputDuration * m_currentTempo;
         outPkt->pts = m_tempoOutputPts;
         outPkt->dts = m_tempoOutputPts;
-        outPkt->duration = STREAM_SEC_TO_TIME(contentDuration);
-        m_tempoOutputPts += STREAM_SEC_TO_TIME(contentDuration);
+        outPkt->duration = STREAM_SEC_TO_TIME(outputDuration);
+        outPkt->dispTime = static_cast<int>(m_tempoContentPts / STREAM_TIME_BASE * 1000.0);
+        m_tempoOutputPts += STREAM_SEC_TO_TIME(outputDuration);
+        m_tempoContentPts += STREAM_SEC_TO_TIME(contentDuration);
 
         outPkt->demuxerId = m_demuxerId;
         m_tempoOutputQueue.push(outPkt);

@@ -223,7 +223,13 @@ private:
   AVFrame* m_filteredFrame = nullptr;
 
   std::queue<DEMUX_PACKET*> m_tempoOutputQueue;
+  // Output PTS (wall-clock rate) — used for packet.pts/dts so ActiveAE
+  // schedules audio correctly. Advances by outputDuration per packet.
   double m_tempoOutputPts = 0.0;
+  // Content PTS (content rate) — used for dispTime and m_currentPts so OSD
+  // progress and GetTime() reflect content position. Advances by contentDuration
+  // per packet (= outputDuration × tempo).
+  double m_tempoContentPts = 0.0;
   int m_tempoCheckCounter = 0;
 
   bool InitTempoProcessing(AVStream* audioStream);

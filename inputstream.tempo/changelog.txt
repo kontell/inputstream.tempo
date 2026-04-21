@@ -1,3 +1,14 @@
+v0.3.2
+- Fix audio glitching under VideoPlayer at non-1× tempo. v0.3.1 made
+  packet pts/dts/duration advance by content time, which broke ActiveAE's
+  wall-clock sync (packet PTS grew faster than samples drained, triggering
+  hard resyncs every ~1-2s at 2× tempo). Now two separate PTS streams:
+    - packet.pts/dts/duration → output (wall-clock) time, for ActiveAE
+    - packet.dispTime (ms) + m_currentPts → content time, for OSD and
+      GetTime() / PAPlayer resume.
+  VideoPlayer reads dispTime for its progress display; PAPlayer reads
+  GetTime() via ICodec — both now get content time, audio stays in sync.
+
 v0.3.1
 - Tempo PTS tracking: advance m_tempoOutputPts by content duration
   (output duration × m_currentTempo) instead of output duration.
