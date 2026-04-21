@@ -14,6 +14,7 @@
 
 #include "IManageDemuxPacket.h"
 
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <memory>
@@ -159,6 +160,7 @@ FFmpegStream::FFmpegStream(IManageDemuxPacket* demuxPacketManager, const Propert
 
   // Tempo processing
   m_currentTempo = props.m_audioTempo;
+  m_userTempo = props.m_audioTempo;
   m_tempoFilePath = props.m_tempoFilePath;
   m_initialSeekTimeSecs = props.m_startTimeSecs;
   m_tempoEnabled = (m_currentTempo != 1.0 || !m_tempoFilePath.empty());
@@ -166,6 +168,10 @@ FFmpegStream::FFmpegStream(IManageDemuxPacket* demuxPacketManager, const Propert
     Log(LOGLEVEL_INFO, "Tempo processing enabled: %.2fx (file: %s)", m_currentTempo, m_tempoFilePath.c_str());
   if (m_initialSeekTimeSecs > 0)
     Log(LOGLEVEL_INFO, "Start time property: %.1fs", m_initialSeekTimeSecs);
+
+  m_liveRampEnabled = props.m_liveRampEnabled;
+  m_liveMinLeadSec = props.m_liveMinLeadSec;
+  m_liveRampRate = props.m_liveRampRate;
 }
 
 FFmpegStream::~FFmpegStream()
@@ -199,6 +205,21 @@ bool FFmpegStream::Open(const std::string& streamUrl, const std::string& mimeTyp
     // here — PAPlayer's init overwrites any seek we do during Open().
     if (m_initialSeekTimeSecs > 0)
       m_currentPts = STREAM_MSEC_TO_TIME(m_initialSeekTimeSecs * 1000.0);
+
+    // Live-edge ramp baseline. For DVR-window live streams, duration is
+    // (approximately) the distance from DVR start to the live edge at open
+    // time. Combined with a monotonic wallclock baseline, we can estimate
+    // current lead as: (duration_at_open + wallclock_elapsed) - current_pts.
+    if (m_isRealTimeStream && m_pFormatContext->duration > 0)
+    {
+      m_liveEdgeAtOpenSec = m_pFormatContext->duration / (double)AV_TIME_BASE;
+      m_wallclockAtOpenSec =
+        std::chrono::duration<double>(
+          std::chrono::steady_clock::now().time_since_epoch()).count();
+      Log(LOGLEVEL_INFO,
+          "Live-edge ramp: baseline duration=%.1fs, min_lead=%.1fs, rate=%.3f/s",
+          m_liveEdgeAtOpenSec, m_liveMinLeadSec, m_liveRampRate);
+    }
   }
   FFmpegLog::SetEnabled(kodi::addon::GetSettingBoolean("allowFFmpegLogging"));
 
@@ -335,9 +356,14 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
     return queued;
   }
 
-  // Periodically check tempo file for runtime changes
+  // Periodically check tempo file for runtime changes, and re-evaluate the
+  // live-edge ramp. Both are rate-limited internally; running them on the
+  // same cadence keeps the hot path simple.
   if (m_tempoEnabled && ++m_tempoCheckCounter % 50 == 0)
+  {
     CheckTempoFileUpdate();
+    CheckLiveRamp();
+  }
 
   DEMUX_PACKET* pPacket = NULL;
   // on some cases where the received packet is invalid we will need to return an empty packet (0 length) otherwise the main loop (in CVideoPlayer)
@@ -725,6 +751,11 @@ bool FFmpegStream::IsRealTimeStream()
 void FFmpegStream::Dispose()
 {
   DestroyTempoProcessing();
+  if (m_liveRampActive)
+  {
+    ClearLiveRampSentinel();
+    m_liveRampActive = false;
+  }
 
   m_pkt.result = -1;
   av_packet_unref(&m_pkt.pkt);
@@ -2879,6 +2910,27 @@ void FFmpegStream::DestroyTempoProcessing()
   m_tempoAudioStreamIndex = -1;
 }
 
+void FFmpegStream::ApplyTempo(double newTempo)
+{
+  if (std::abs(newTempo - m_currentTempo) < 0.001)
+    return;
+
+  Log(LOGLEVEL_INFO, "Tempo: changing from %.2fx to %.2fx", m_currentTempo, newTempo);
+
+  // Try live update via send_command (avoids graph rebuild + audio glitch)
+  char res[64] = {};
+  char tempoStr[32];
+  snprintf(tempoStr, sizeof(tempoStr), "%.4f", newTempo);
+  int ret = avfilter_graph_send_command(m_filterGraph, "atempo", "tempo",
+                                        tempoStr, res, sizeof(res), 0);
+  if (ret < 0)
+  {
+    Log(LOGLEVEL_WARNING, "Tempo: send_command failed (%d), rebuilding graph", ret);
+    BuildFilterGraph(newTempo);
+  }
+  m_currentTempo = newTempo;
+}
+
 void FFmpegStream::CheckTempoFileUpdate()
 {
   if (m_tempoFilePath.empty())
@@ -2894,23 +2946,124 @@ void FFmpegStream::CheckTempoFileUpdate()
     f >> newTempo;
     if (newTempo < 0.5 || newTempo > 100.0)
       return;
-    if (std::abs(newTempo - m_currentTempo) < 0.001)
+    if (std::abs(newTempo - m_userTempo) < 0.001)
       return;
 
-    Log(LOGLEVEL_INFO, "Tempo: changing from %.2fx to %.2fx", m_currentTempo, newTempo);
+    m_userTempo = newTempo;
 
-    // Try live update via send_command (avoids graph rebuild + audio glitch)
-    char res[64] = {};
-    char tempoStr[32];
-    snprintf(tempoStr, sizeof(tempoStr), "%.4f", newTempo);
-    int ret = avfilter_graph_send_command(m_filterGraph, "atempo", "tempo", tempoStr, res, sizeof(res), 0);
-    if (ret < 0)
+    // Effective tempo is capped by the live-edge ramp when applicable.
+    double effective = newTempo;
+    if (m_liveRampEnabled && m_isRealTimeStream && m_liveEdgeAtOpenSec > 0)
     {
-      // Fallback: rebuild the graph
-      Log(LOGLEVEL_WARNING, "Tempo: send_command failed (%d), rebuilding graph", ret);
-      BuildFilterGraph(newTempo);
+      double leadSec = ComputeLeadSeconds();
+      effective = std::min(newTempo, ComputeRampCeiling(leadSec));
     }
-    m_currentTempo = newTempo;
+    ApplyTempo(effective);
+  }
+  catch (...)
+  {
+  }
+}
+
+double FFmpegStream::ComputeLeadSeconds()
+{
+  // Live edge at current wallclock = baseline (duration at open) +
+  // wallclock elapsed since open. Our lead = live edge - current content pos.
+  double nowSec =
+    std::chrono::duration<double>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+  double liveEdgeNow = m_liveEdgeAtOpenSec + (nowSec - m_wallclockAtOpenSec);
+  double currentPosSec = m_currentPts / (double)STREAM_TIME_BASE;
+  return liveEdgeNow - currentPosSec;
+}
+
+double FFmpegStream::ComputeRampCeiling(double leadSec)
+{
+  // No ramp when the user is already at or below 1.0x, or when the rate is
+  // non-positive (disabled).
+  if (m_userTempo <= 1.0 || m_liveRampRate <= 0.0)
+    return m_userTempo;
+
+  // Ramp spans from (min_lead + (user-1)/rate) down to min_lead, linear.
+  // Above ramp_start: ceiling = user tempo (no cap).
+  // Below min_lead:   ceiling = 1.0.
+  double rampDistance = (m_userTempo - 1.0) / m_liveRampRate;
+  double rampStart = m_liveMinLeadSec + rampDistance;
+
+  if (leadSec >= rampStart)
+    return m_userTempo;
+  if (leadSec <= m_liveMinLeadSec)
+    return 1.0;
+
+  double t = (leadSec - m_liveMinLeadSec) / rampDistance;  // 0..1
+  return 1.0 + t * (m_userTempo - 1.0);
+}
+
+void FFmpegStream::CheckLiveRamp()
+{
+  if (!m_liveRampEnabled || !m_isRealTimeStream || m_liveEdgeAtOpenSec <= 0)
+    return;
+  if (m_userTempo <= 1.0)
+  {
+    if (m_liveRampActive)
+    {
+      m_liveRampActive = false;
+      ClearLiveRampSentinel();
+    }
+    return;
+  }
+
+  // Sample every 1s while ramp is active, every 5s otherwise. Cheap enough
+  // that we let it run every tempo-check tick, but the interval gate keeps
+  // per-tick work small.
+  double nowSec =
+    std::chrono::duration<double>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+  double minInterval = m_liveRampActive ? 1.0 : 5.0;
+  if (nowSec - m_lastRampSampleSec < minInterval)
+    return;
+  m_lastRampSampleSec = nowSec;
+
+  double leadSec = ComputeLeadSeconds();
+  double ceiling = ComputeRampCeiling(leadSec);
+  double effective = std::min(m_userTempo, ceiling);
+
+  ApplyTempo(effective);
+
+  bool wasActive = m_liveRampActive;
+  m_liveRampActive = (ceiling < m_userTempo - 0.001);
+
+  if (m_liveRampActive)
+    WriteLiveRampSentinel(leadSec, effective);
+  else if (wasActive)
+    ClearLiveRampSentinel();
+}
+
+void FFmpegStream::WriteLiveRampSentinel(double leadSec, double effectiveTempo)
+{
+  std::string path = kodi::vfs::TranslateSpecialProtocol(
+    "special://temp/inputstream_tempo_live_ramp");
+  try
+  {
+    std::ofstream f(path);
+    if (!f.is_open())
+      return;
+    f << "{\"active\":true,\"lead_sec\":" << leadSec
+      << ",\"user_tempo\":" << m_userTempo
+      << ",\"effective_tempo\":" << effectiveTempo << "}";
+  }
+  catch (...)
+  {
+  }
+}
+
+void FFmpegStream::ClearLiveRampSentinel()
+{
+  std::string path = kodi::vfs::TranslateSpecialProtocol(
+    "special://temp/inputstream_tempo_live_ramp");
+  try
+  {
+    kodi::vfs::DeleteFile(path);
   }
   catch (...)
   {

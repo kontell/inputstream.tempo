@@ -38,6 +38,9 @@ static const std::string PROGRAMME_CATCHUP_ID = "inputstream.tempo.programme_cat
 static const std::string AUDIO_TEMPO = "inputstream.tempo.tempo";
 static const std::string AUDIO_TEMPO_FILE = "inputstream.tempo.tempo_file";
 static const std::string AUDIO_START_TIME = "inputstream.tempo.start_time";
+static const std::string LIVE_RAMP_ENABLED = "inputstream.tempo.live_ramp_enabled";
+static const std::string LIVE_MIN_LEAD_SEC = "inputstream.tempo.live_min_lead_sec";
+static const std::string LIVE_RAMP_RATE = "inputstream.tempo.live_ramp_rate";
 
 class ATTR_DLL_LOCAL InputStreamFFmpegDirect
   : public kodi::addon::CInstanceInputStream, ffmpegdirect::IManageDemuxPacket

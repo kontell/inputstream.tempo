@@ -53,5 +53,12 @@ namespace ffmpegdirect
     double m_audioTempo = 1.0;
     std::string m_tempoFilePath;
     double m_startTimeSecs = 0.0;
+
+    // Live-edge tempo ramp. For live streams with a DVR window, the effective
+    // tempo is capped as the playhead approaches the live edge (you can't play
+    // faster than real time once you're there).
+    bool m_liveRampEnabled = true;
+    double m_liveMinLeadSec = 30.0;   // lead at which effective tempo hits 1.0
+    double m_liveRampRate = 0.01;     // tempo drop per second of lead
   };
 } //namespace ffmpegdirect

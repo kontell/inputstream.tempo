@@ -166,6 +166,18 @@ bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props
     {
       m_properties.m_startTimeSecs = std::stod(prop.second);
     }
+    else if (LIVE_RAMP_ENABLED == prop.first)
+    {
+      m_properties.m_liveRampEnabled = (prop.second == "true" || prop.second == "1");
+    }
+    else if (LIVE_MIN_LEAD_SEC == prop.first)
+    {
+      m_properties.m_liveMinLeadSec = std::stod(prop.second);
+    }
+    else if (LIVE_RAMP_RATE == prop.first)
+    {
+      m_properties.m_liveRampRate = std::stod(prop.second);
+    }
   }
 
   m_streamUrl = props.GetURL();

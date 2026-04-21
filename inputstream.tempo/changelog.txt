@@ -1,3 +1,27 @@
+v0.4.0
+- Live-edge tempo ramp. For live streams with a DVR window, the effective
+  tempo is automatically ramped down to 1.0x as the playhead approaches
+  the live edge, so sped-up playback can't outrun real time.
+  - Ramp is linear from the user's requested tempo at a lead of
+    (min_lead + (tempo - 1) / rate) seconds down to 1.0x at min_lead.
+  - Defaults: enabled, min_lead_sec=30, rate=0.01/s (tempo drops 0.01x
+    per second of lead lost).
+  - User tempo increases during the ramp are capped by the current
+    ceiling; bumps above the ceiling take effect on seek-back.
+  - Seek back (lead grows): effective tempo returns to user tempo on
+    the next sample tick.
+  - No-op for VOD, for pure live streams that report no duration, and
+    when the user tempo is <= 1.0.
+- New listitem props (optional):
+  inputstream.tempo.live_ramp_enabled  (default "true")
+  inputstream.tempo.live_min_lead_sec  (default 30)
+  inputstream.tempo.live_ramp_rate     (default 0.01)
+- Sentinel file special://temp/inputstream_tempo_live_ramp exposes
+  {active, lead_sec, user_tempo, effective_tempo} as JSON while the
+  ramp is capping playback (removed otherwise).
+- Tempo file polling now tracks user tempo separately from applied
+  tempo so the ramp can override without losing user intent.
+
 v0.3.1
 - Tempo PTS tracking: advance m_tempoOutputPts by content duration
   (output duration × m_currentTempo) instead of output duration.

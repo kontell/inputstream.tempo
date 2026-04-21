@@ -209,7 +209,8 @@ private:
 
   // ── Tempo processing ──
   bool m_tempoEnabled = false;
-  double m_currentTempo = 1.0;
+  double m_userTempo = 1.0;         // what the user/tempo-file requested
+  double m_currentTempo = 1.0;      // what's active in the filter graph
   std::string m_tempoFilePath;
   double m_initialSeekTimeSecs = 0.0;
   bool m_tempoSeekPending = false;
@@ -226,11 +227,29 @@ private:
   double m_tempoOutputPts = 0.0;
   int m_tempoCheckCounter = 0;
 
+  // Live-edge ramp state. Populated at Open() for live streams with a DVR
+  // window; used to estimate distance from the live edge and cap tempo as
+  // the playhead approaches real-time.
+  bool m_liveRampEnabled = true;
+  double m_liveMinLeadSec = 30.0;
+  double m_liveRampRate = 0.01;
+  double m_liveEdgeAtOpenSec = 0.0;   // AVFormatContext->duration at Open, sec
+  double m_wallclockAtOpenSec = 0.0;  // monotonic clock at Open, sec
+  double m_lastRampSampleSec = 0.0;   // throttle sampling
+  bool m_liveRampActive = false;      // true iff ramp is currently capping tempo
+
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();
   bool BuildFilterGraph(double tempo);
   void CheckTempoFileUpdate();
   void ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream);
+
+  void ApplyTempo(double newTempo);
+  double ComputeLeadSeconds();
+  double ComputeRampCeiling(double leadSec);
+  void CheckLiveRamp();
+  void WriteLiveRampSentinel(double leadSec, double effectiveTempo);
+  void ClearLiveRampSentinel();
 };
 
 } //namespace ffmpegdirect
