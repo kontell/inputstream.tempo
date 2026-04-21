@@ -668,6 +668,13 @@ int FFmpegStream::GetTime()
 
 bool FFmpegStream::GetTimes(kodi::addon::InputstreamTimes& times)
 {
+  // When tempo is active, VideoPlayer must use the IDisplayTime path so it
+  // computes state.time via (dispTime - dts) and reports CONTENT position.
+  // Returning true here would route it through state.time = clock, which is
+  // wall-clock (output) time and won't change when tempo changes.
+  if (m_tempoEnabled)
+    return false;
+
   if (!IsRealTimeStream())
   {
     times.SetStartTime(0);

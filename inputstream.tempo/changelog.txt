@@ -1,3 +1,11 @@
+v0.3.3
+- VideoPlayer: make progress display follow tempo changes. GetTimes()
+  now returns false when tempo is active, so VideoPlayer routes through
+  its IDisplayTime branch (state.time += dispTime - dts) instead of
+  the ITimes branch (state.time = wall-clock). The ITimes path ignores
+  dispTime entirely and progress would advance at wall-clock rate
+  regardless of tempo. Non-tempo playback is unaffected.
+
 v0.3.2
 - Fix audio glitching under VideoPlayer at non-1× tempo. v0.3.1 made
   packet pts/dts/duration advance by content time, which broke ActiveAE's
