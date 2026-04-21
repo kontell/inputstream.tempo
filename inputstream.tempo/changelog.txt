@@ -1,3 +1,11 @@
+v0.3.1
+- Tempo PTS tracking: advance m_tempoOutputPts by content duration
+  (output duration × m_currentTempo) instead of output duration.
+  Fixes OSD current-position/progress-bar showing wall-clock time at
+  non-1× tempo — now tracks content time correctly for both PAPlayer
+  (with the ICodec::GetTime() addition in Kodi master) and VideoPlayer
+  via the existing dispTime path.
+
 v0.3.0
 - Keymap: PgUp/PgDn for speed up/down (replaces square brackets).
 - start_time property: pre-sets m_currentPts so GetTime() returns the
