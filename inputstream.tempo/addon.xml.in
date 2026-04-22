@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="0.3.4"
+  version="0.3.5"
   name="Inputstream Tempo"
   provider-name="konell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with audio tempo control (pitch-corrected playback speed)</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in audio tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts. Based on inputstream.ffmpegdirect.</description>
-    <news>v0.3.4 VideoPlayer: OSD progress now reports content position at non-1x tempo (GetTimes returns dynamic ptsStart = output − content, so state.time = clock − ptsStart advances at content rate).</news>
+    <news>v0.3.5 Revert v0.3.4 dynamic ptsStart (OSD exploded past tempo rate when demux ran ahead of playback). Return to v0.3.3 approach: GetTimes returns false at tempo, VideoPlayer falls through to IDisplayTime branch which uses consumed-packet state.dts/dispTime.</news>
   </extension>
 </addon>
