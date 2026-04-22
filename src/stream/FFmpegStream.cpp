@@ -2948,59 +2948,86 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
         stream->time_base.num, stream->time_base.den);
   }
 
-  int ret = avcodec_send_packet(m_audioDecoderCtx, pkt);
-  if (ret < 0 && ret != AVERROR(EAGAIN))
+  // Send/receive loop. avcodec_send_packet returns EAGAIN when the decoder's
+  // internal buffer is full; the correct response is to drain frames with
+  // avcodec_receive_frame and then retry the send. The old single-shot flow
+  // silently dropped packets whenever the decoder was saturated, which for
+  // small-frame codecs (opus: 20 ms frames) can happen immediately and make
+  // the pipeline stall before any output reaches the sink.
+  int ret;
+  bool packetSent = false;
+  while (!packetSent)
   {
-    char errbuf[128] = {};
-    av_strerror(ret, errbuf, sizeof(errbuf));
-    Log(LOGLEVEL_WARNING, "Tempo: avcodec_send_packet failed: %d (%s)", ret, errbuf);
-    return;
-  }
-
-  while (avcodec_receive_frame(m_audioDecoderCtx, m_decodedFrame) == 0)
-  {
-    ret = av_buffersrc_add_frame(m_bufferSrcCtx, m_decodedFrame);
-    av_frame_unref(m_decodedFrame);
-    if (ret < 0)
+    ret = avcodec_send_packet(m_audioDecoderCtx, pkt);
+    if (ret == 0 || ret == AVERROR_EOF)
+    {
+      packetSent = true;
+    }
+    else if (ret != AVERROR(EAGAIN))
     {
       char errbuf[128] = {};
       av_strerror(ret, errbuf, sizeof(errbuf));
-      Log(LOGLEVEL_WARNING, "Tempo: av_buffersrc_add_frame failed: %d (%s)", ret, errbuf);
-      continue;
+      Log(LOGLEVEL_WARNING, "Tempo: avcodec_send_packet failed: %d (%s)", ret, errbuf);
+      return;
+    }
+    // On EAGAIN, fall through to drain and then retry send.
+
+    bool drainedAny = false;
+    while (avcodec_receive_frame(m_audioDecoderCtx, m_decodedFrame) == 0)
+    {
+      drainedAny = true;
+      ret = av_buffersrc_add_frame(m_bufferSrcCtx, m_decodedFrame);
+      av_frame_unref(m_decodedFrame);
+      if (ret < 0)
+      {
+        char errbuf[128] = {};
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        Log(LOGLEVEL_WARNING, "Tempo: av_buffersrc_add_frame failed: %d (%s)", ret, errbuf);
+        continue;
+      }
+
+      while (av_buffersink_get_frame(m_bufferSinkCtx, m_filteredFrame) == 0)
+      {
+        int channels = m_filteredFrame->ch_layout.nb_channels;
+        int bytesPerSample = 4; // float32
+        int pcmSize = m_filteredFrame->nb_samples * channels * bytesPerSample;
+
+        DEMUX_PACKET* outPkt = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(pcmSize);
+        if (outPkt)
+        {
+          memcpy(outPkt->pData, m_filteredFrame->data[0], pcmSize);
+          outPkt->iSize = pcmSize;
+          outPkt->iStreamId = stream->index;
+
+          // Two time streams. ActiveAE schedules audio off packet pts/dts
+          // against the wall-clock sample drain, so pts/dts/duration must
+          // advance at OUTPUT rate (nb_samples/sample_rate), or it accumulates
+          // a huge sync error and hard-resyncs (audible glitch) at non-1x
+          // tempo. The OSD and GetTime() want CONTENT position, so we carry
+          // that in dispTime and m_currentPts (via the queue-pop path).
+          double outputDuration = (double)m_filteredFrame->nb_samples / m_audioDecoderCtx->sample_rate;
+          double contentDuration = outputDuration * m_currentTempo;
+          outPkt->pts = m_tempoOutputPts;
+          outPkt->dts = m_tempoOutputPts;
+          outPkt->duration = STREAM_SEC_TO_TIME(outputDuration);
+          outPkt->dispTime = static_cast<int>(m_tempoContentPts / STREAM_TIME_BASE * 1000.0);
+          m_tempoOutputPts += STREAM_SEC_TO_TIME(outputDuration);
+          m_tempoContentPts += STREAM_SEC_TO_TIME(contentDuration);
+
+          outPkt->demuxerId = m_demuxerId;
+          m_tempoOutputQueue.push(outPkt);
+        }
+        av_frame_unref(m_filteredFrame);
+      }
     }
 
-    while (av_buffersink_get_frame(m_bufferSinkCtx, m_filteredFrame) == 0)
+    // If send_packet returned EAGAIN but we drained nothing, the decoder is
+    // stuck in an unexpected state — bail out to avoid an infinite loop.
+    if (!packetSent && !drainedAny)
     {
-      int channels = m_filteredFrame->ch_layout.nb_channels;
-      int bytesPerSample = 4; // float32
-      int pcmSize = m_filteredFrame->nb_samples * channels * bytesPerSample;
-
-      DEMUX_PACKET* outPkt = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(pcmSize);
-      if (outPkt)
-      {
-        memcpy(outPkt->pData, m_filteredFrame->data[0], pcmSize);
-        outPkt->iSize = pcmSize;
-        outPkt->iStreamId = stream->index;
-
-        // Two time streams. ActiveAE schedules audio off packet pts/dts
-        // against the wall-clock sample drain, so pts/dts/duration must
-        // advance at OUTPUT rate (nb_samples/sample_rate), or it accumulates
-        // a huge sync error and hard-resyncs (audible glitch) at non-1x
-        // tempo. The OSD and GetTime() want CONTENT position, so we carry
-        // that in dispTime and m_currentPts (via the queue-pop path).
-        double outputDuration = (double)m_filteredFrame->nb_samples / m_audioDecoderCtx->sample_rate;
-        double contentDuration = outputDuration * m_currentTempo;
-        outPkt->pts = m_tempoOutputPts;
-        outPkt->dts = m_tempoOutputPts;
-        outPkt->duration = STREAM_SEC_TO_TIME(outputDuration);
-        outPkt->dispTime = static_cast<int>(m_tempoContentPts / STREAM_TIME_BASE * 1000.0);
-        m_tempoOutputPts += STREAM_SEC_TO_TIME(outputDuration);
-        m_tempoContentPts += STREAM_SEC_TO_TIME(contentDuration);
-
-        outPkt->demuxerId = m_demuxerId;
-        m_tempoOutputQueue.push(outPkt);
-      }
-      av_frame_unref(m_filteredFrame);
+      Log(LOGLEVEL_WARNING,
+          "Tempo: decoder EAGAIN with no drainable frames — dropping packet");
+      return;
     }
   }
 }
