@@ -668,12 +668,37 @@ int FFmpegStream::GetTime()
 
 bool FFmpegStream::GetTimes(kodi::addon::InputstreamTimes& times)
 {
-  // When tempo is active, VideoPlayer must use the IDisplayTime path so it
-  // computes state.time via (dispTime - dts) and reports CONTENT position.
-  // Returning true here would route it through state.time = clock, which is
-  // wall-clock (output) time and won't change when tempo changes.
-  if (m_tempoEnabled)
-    return false;
+  if (m_tempoEnabled && !IsRealTimeStream())
+  {
+    // VideoPlayer computes state.time in the ITimes branch as
+    //   state.time_ms = (m_clock.GetClock() - times.ptsStart) / 1000
+    // The DVD master clock is anchored to packet DTS (our output PTS) and
+    // advances at wall-clock. We want state.time to report CONTENT position.
+    // Setting ptsStart = (output - content) makes state.time track content:
+    //   state.time_us = clock_us - (output - content)
+    //                 ≈ output - output + content = content ✓
+    // m_tempoOutputPts / m_tempoContentPts are updated on every emitted
+    // packet, so ptsStart stays current as tempo changes.
+    double ptsStart = m_tempoOutputPts - m_tempoContentPts;
+
+    double contentDurationUs = 0;
+    if (m_tempoAudioStreamIndex >= 0 &&
+        m_tempoAudioStreamIndex < static_cast<int>(m_pFormatContext->nb_streams))
+    {
+      AVStream* st = m_pFormatContext->streams[m_tempoAudioStreamIndex];
+      if (st && st->duration > 0 && st->time_base.den > 0)
+        contentDurationUs = static_cast<double>(
+            av_rescale_q(st->duration, st->time_base, AV_TIME_BASE_Q));
+    }
+    if (contentDurationUs == 0 && m_pFormatContext->duration > 0)
+      contentDurationUs = static_cast<double>(m_pFormatContext->duration);
+
+    times.SetStartTime(0);
+    times.SetPtsStart(ptsStart);
+    times.SetPtsBegin(ptsStart);
+    times.SetPtsEnd(ptsStart + contentDurationUs);
+    return true;
+  }
 
   if (!IsRealTimeStream())
   {

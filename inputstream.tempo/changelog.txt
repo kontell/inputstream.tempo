@@ -1,3 +1,15 @@
+v0.3.4
+- VideoPlayer: OSD progress now reports content position at non-1x tempo.
+  v0.3.3 tried routing via the IDisplayTime branch (returning false from
+  GetTimes so VideoPlayer would use dispTime - dts) but state.time still
+  advanced at wall-clock rate. Switched to the ITimes branch with a
+  dynamic ptsStart = (m_tempoOutputPts - m_tempoContentPts), so
+    state.time = (clock - ptsStart) / 1000
+               = output - (output - content) = content
+  directly, without relying on dispTime propagation. ptsStart refreshes
+  on every emitted packet, so it tracks live tempo changes. Non-tempo
+  playback is unaffected.
+
 v0.3.3
 - VideoPlayer: make progress display follow tempo changes. GetTimes()
   now returns false when tempo is active, so VideoPlayer routes through
