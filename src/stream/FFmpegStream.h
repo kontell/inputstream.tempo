@@ -231,6 +231,7 @@ private:
   // per packet (= outputDuration × tempo).
   double m_tempoContentPts = 0.0;
   int m_tempoCheckCounter = 0;
+  int m_tempoEmittedPackets = 0;
 
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();

@@ -302,6 +302,7 @@ void FFmpegStream::DemuxFlush()
     }
     m_tempoOutputPts = 0.0;
     m_tempoContentPts = 0.0;
+    m_tempoEmittedPackets = 0;
   }
 
   m_currentPts = STREAM_NOPTS_VALUE;
@@ -3016,6 +3017,21 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
 
           outPkt->demuxerId = m_demuxerId;
           m_tempoOutputQueue.push(outPkt);
+
+          // Diagnostic: log first N emitted packets + every 500th so we can
+          // see the pipeline is producing output and what the pts/dispTime
+          // values look like when playback stalls.
+          ++m_tempoEmittedPackets;
+          if (m_tempoEmittedPackets <= 3 || m_tempoEmittedPackets % 500 == 0)
+          {
+            Log(LOGLEVEL_INFO,
+                "Tempo: emit #%d — samples=%d dur=%.3fms pts=%.3fs dispTime=%dms queue=%zu",
+                m_tempoEmittedPackets, m_filteredFrame->nb_samples,
+                outputDuration * 1000.0,
+                outPkt->pts / (double)STREAM_TIME_BASE,
+                outPkt->dispTime,
+                m_tempoOutputQueue.size());
+          }
         }
         av_frame_unref(m_filteredFrame);
       }
