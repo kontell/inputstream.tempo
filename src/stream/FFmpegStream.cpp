@@ -2942,18 +2942,32 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
     m_tempoOutputPts = actualPts;
     m_tempoContentPts = actualPts;
     m_tempoSeekPending = false;
+    Log(LOGLEVEL_INFO,
+        "Tempo: seek anchor — pkt dts=%lld → pts=%.3fs (tb=%d/%d)",
+        (long long)pkt->dts, actualPts / (double)STREAM_TIME_BASE,
+        stream->time_base.num, stream->time_base.den);
   }
 
   int ret = avcodec_send_packet(m_audioDecoderCtx, pkt);
   if (ret < 0 && ret != AVERROR(EAGAIN))
+  {
+    char errbuf[128] = {};
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    Log(LOGLEVEL_WARNING, "Tempo: avcodec_send_packet failed: %d (%s)", ret, errbuf);
     return;
+  }
 
   while (avcodec_receive_frame(m_audioDecoderCtx, m_decodedFrame) == 0)
   {
     ret = av_buffersrc_add_frame(m_bufferSrcCtx, m_decodedFrame);
     av_frame_unref(m_decodedFrame);
     if (ret < 0)
+    {
+      char errbuf[128] = {};
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      Log(LOGLEVEL_WARNING, "Tempo: av_buffersrc_add_frame failed: %d (%s)", ret, errbuf);
       continue;
+    }
 
     while (av_buffersink_get_frame(m_bufferSinkCtx, m_filteredFrame) == 0)
     {
