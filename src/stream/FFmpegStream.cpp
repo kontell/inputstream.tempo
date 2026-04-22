@@ -671,19 +671,13 @@ int FFmpegStream::GetTime()
 
 bool FFmpegStream::GetTimes(kodi::addon::InputstreamTimes& times)
 {
-  // When tempo is active, return false so VideoPlayer falls through to its
-  // IDisplayTime branch. That branch computes
-  //   state.time = clock + (dispTime - state.dts) / 1000
-  // where state.dts and dispTime come from packets AFTER VideoPlayer has
-  // consumed them — so the offset tracks actual playback position, not our
-  // emission rate. The ITimes branch we used in v0.3.4 is fragile: it takes
-  // state.time = (clock - ptsStart) where ptsStart was our internal
-  // (m_tempoOutputPts − m_tempoContentPts). When demuxing runs ahead of
-  // audio consumption, that difference drifts beyond wall-clock and the OSD
-  // jumps wildly past tempo rate.
-  if (m_tempoEnabled)
-    return false;
-
+  // Always report static ptsStart=0, ptsEnd=duration. At non-1x tempo this
+  // makes the OSD tick at wall-clock rate instead of content rate — but
+  // keeping audio flowing is higher priority right now. Both IDisplayTime
+  // (v0.3.3/v0.3.5) and dynamic ITimes (v0.3.4) routes broke audio playback
+  // in ways I don't yet understand (state.time blows up to absurd values in
+  // Kodi's UpdatePlayState). Revert to the v0.3.2 behavior that had working
+  // audio; OSD-follows-tempo needs a separate, better fix.
   if (!IsRealTimeStream())
   {
     times.SetStartTime(0);
