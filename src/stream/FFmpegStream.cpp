@@ -303,6 +303,8 @@ void FFmpegStream::DemuxFlush()
     m_tempoOutputPts = 0.0;
     m_tempoContentPts = 0.0;
     m_tempoEmittedPackets = 0;
+    m_tempoFirstEmitWall = std::chrono::steady_clock::time_point{};
+    m_tempoCumulativeOutputSecs = 0.0;
   }
 
   m_currentPts = STREAM_NOPTS_VALUE;
@@ -3043,6 +3045,30 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
                 outPkt->pts / (double)STREAM_TIME_BASE,
                 outPkt->dispTime,
                 m_tempoOutputQueue.size());
+          }
+
+          // Wall-clock throttle. Kodi's ffmpeg demuxer is implicitly paced
+          // by av_read_frame (which blocks on network/disk). Our tempo path
+          // decodes + filters in-memory, so it can race ahead of playback
+          // at hundreds of times real-time, producing so much pending audio
+          // that Kodi's cache-fill sync threshold never settles and the
+          // audio sink stays paused. Cap output generation at a fixed lead
+          // over wall-clock (kLeadSecs) — enough to fill the sink's cache
+          // and tolerate scheduling jitter, not enough to flood.
+          if (m_tempoFirstEmitWall == std::chrono::steady_clock::time_point{})
+            m_tempoFirstEmitWall = std::chrono::steady_clock::now();
+          m_tempoCumulativeOutputSecs += outputDuration;
+
+          constexpr double kLeadSecs = 2.0;
+          constexpr double kCatchupSecs = 1.0;
+          const double wallElapsed = std::chrono::duration<double>(
+              std::chrono::steady_clock::now() - m_tempoFirstEmitWall).count();
+          const double aheadBy = m_tempoCumulativeOutputSecs - wallElapsed;
+          if (aheadBy > kLeadSecs)
+          {
+            const auto sleepFor = std::chrono::duration<double>(aheadBy - kCatchupSecs);
+            std::this_thread::sleep_for(
+                std::chrono::duration_cast<std::chrono::milliseconds>(sleepFor));
           }
         }
         av_frame_unref(m_filteredFrame);

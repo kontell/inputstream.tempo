@@ -13,6 +13,7 @@
 #include "DemuxStream.h"
 #include "CurlInput.h"
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -232,6 +233,13 @@ private:
   double m_tempoContentPts = 0.0;
   int m_tempoCheckCounter = 0;
   int m_tempoEmittedPackets = 0;
+  // Wall-clock throttling state. Without this the tempo pipeline races
+  // through the source file as fast as ffmpeg can decode, producing
+  // hundreds of seconds of output audio per wall-second, which starves
+  // Kodi's audio sink of the initial fill it needs to transition out of
+  // SYNC_STARTING. We cap emission at a fixed lead over wall-clock.
+  std::chrono::steady_clock::time_point m_tempoFirstEmitWall{};
+  double m_tempoCumulativeOutputSecs = 0.0;
 
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();
