@@ -2993,6 +2993,18 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
         int bytesPerSample = 4; // float32
         int pcmSize = m_filteredFrame->nb_samples * channels * bytesPerSample;
 
+        // Diagnostic: confirm the buffersink is producing interleaved flt
+        // (AV_SAMPLE_FMT_FLT = 3). If it's fltp (5), our memcpy below only
+        // copies the first plane and the second channel is garbage, which
+        // would confuse Kodi's audio codec/sink.
+        if (m_tempoEmittedPackets == 0)
+        {
+          Log(LOGLEVEL_INFO,
+              "Tempo: first filter frame — fmt=%s ch=%d samples=%d linesize=%d",
+              av_get_sample_fmt_name((AVSampleFormat)m_filteredFrame->format),
+              channels, m_filteredFrame->nb_samples, m_filteredFrame->linesize[0]);
+        }
+
         DEMUX_PACKET* outPkt = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(pcmSize);
         if (outPkt)
         {
