@@ -198,7 +198,16 @@ bool FFmpegStream::Open(const std::string& streamUrl, const std::string& mimeTyp
     // the calling addon's Python seek lands via onAVStarted. No actual seek
     // here — PAPlayer's init overwrites any seek we do during Open().
     if (m_initialSeekTimeSecs > 0)
+    {
       m_currentPts = STREAM_MSEC_TO_TIME(m_initialSeekTimeSecs * 1000.0);
+      // Arm the initial seek hold — DemuxRead will return empty packets
+      // until the caller's bookmark seek lands (or timeout).
+      m_initialSeekHoldActive = true;
+      m_initialSeekHoldStart = std::chrono::steady_clock::now();
+      Log(LOGLEVEL_INFO, "Tempo: initial seek hold armed (target=%.1fs, timeout=%lldms)",
+          m_initialSeekTimeSecs,
+          static_cast<long long>(kInitialSeekHoldTimeout.count()));
+    }
   }
   FFmpegLog::SetEnabled(kodi::addon::GetSettingBoolean("allowFFmpegLogging"));
 
@@ -317,8 +326,40 @@ void FFmpegStream::DemuxFlush()
   m_seekToKeyFrame = false;
 }
 
+bool FFmpegStream::CheckAndUpdateInitialSeekHold()
+{
+  if (!m_initialSeekHoldActive)
+    return false;
+  const auto elapsed = std::chrono::steady_clock::now() - m_initialSeekHoldStart;
+  if (elapsed >= kInitialSeekHoldTimeout)
+  {
+    m_initialSeekHoldActive = false;
+    Log(LOGLEVEL_WARNING,
+        "Tempo: initial seek hold released on timeout (no seek within %lldms — "
+        "playback will begin from the stream start)",
+        static_cast<long long>(kInitialSeekHoldTimeout.count()));
+    return false;
+  }
+  return true;
+}
+
 DEMUX_PACKET* FFmpegStream::DemuxRead()
 {
+  // Initial seek hold: gate all output until the caller's resume seek
+  // arrives (cleared in SeekTime) or the timeout expires.
+  if (m_tempoEnabled && CheckAndUpdateInitialSeekHold())
+  {
+    // Short yield so the demuxing thread doesn't spin hot while waiting.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    DEMUX_PACKET* empty = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(0);
+    if (empty)
+    {
+      empty->iSize = 0;
+      empty->iStreamId = 0;
+    }
+    return empty;
+  }
+
   // Return buffered tempo-processed packets first
   if (m_tempoEnabled && !m_tempoOutputQueue.empty())
   {
@@ -1520,6 +1561,17 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
   {
     time = 0;
     hitEnd = true;
+  }
+
+  // Clear the initial seek hold on any seek that isn't PAPlayer's init
+  // SeekTime(0). The init seeks converge on 0; the bookmark seek lands
+  // somewhere non-trivial. 100 ms tolerance keeps the boundary loose
+  // enough to cover backwards=true anchor seeks near zero.
+  if (m_initialSeekHoldActive && time > 100.0)
+  {
+    m_initialSeekHoldActive = false;
+    Log(LOGLEVEL_INFO,
+        "Tempo: initial seek hold cleared by SeekTime(%.3fs)", time / 1000.0);
   }
 
   // Reset tempo pipeline on seek. Set m_tempoSeekPending so the first raw

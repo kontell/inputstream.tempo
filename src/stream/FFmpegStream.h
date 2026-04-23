@@ -241,6 +241,18 @@ private:
   std::chrono::steady_clock::time_point m_tempoFirstEmitWall{};
   double m_tempoCumulativeOutputSecs = 0.0;
 
+  // Initial seek hold. When the caller sets inputstream.tempo.start_time,
+  // PAPlayer is about to issue a resume seek to that position — but the
+  // sink may Resume() before the seek arrives and play pre-roll at pts=0
+  // (the "fraction of a second from the start of the book" leak). While
+  // the hold is active, DemuxRead returns empty packets so nothing reaches
+  // the sink until SeekTime clears the hold, or kInitialSeekHoldTimeout
+  // elapses as a safety fallback.
+  bool m_initialSeekHoldActive = false;
+  std::chrono::steady_clock::time_point m_initialSeekHoldStart{};
+  static constexpr std::chrono::milliseconds kInitialSeekHoldTimeout{2000};
+  bool CheckAndUpdateInitialSeekHold();
+
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();
   bool BuildFilterGraph(double tempo);
