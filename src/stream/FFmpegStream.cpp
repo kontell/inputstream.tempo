@@ -1562,12 +1562,14 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
   // Reset tempo pipeline on seek. Set m_tempoSeekPending so the first raw
   // audio packet after seek initialises m_tempoOutputPts from its actual DTS
   // (av_seek_frame may land at a different position than requested, especially
-  // for MP3 VBR). Also rebuild the atempo filter graph — atempo keeps
-  // internal sample history across flushes, so after a seek the first post-
-  // seek frames blend residual samples from the pre-seek position with the
-  // new input. Audible as a brief click/glitch at stream start (where
-  // PAPlayer's init SeekTime(0) immediately follows the first emit) and at
-  // any user-triggered seek.
+  // for MP3 VBR). For startup seeks only, also rebuild the atempo filter
+  // graph — atempo keeps internal sample history across flushes, so the
+  // init SeekTime(0) that PAPlayer issues right after the first emit leaves
+  // the filter holding stale start-of-file samples that blend with real
+  // post-bookmark audio (audible click). Rebuilding discards that. After a
+  // handful of emitted packets the filter is in steady state and a rebuild
+  // costs more than it gains (brief audible gap at user-initiated seeks),
+  // so skip it.
   if (m_tempoEnabled && m_audioDecoderCtx)
   {
     avcodec_flush_buffers(m_audioDecoderCtx);
@@ -1576,7 +1578,8 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
       m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
       m_tempoOutputQueue.pop();
     }
-    BuildFilterGraph(m_currentTempo);
+    if (m_tempoEmittedPackets < 10)
+      BuildFilterGraph(m_currentTempo);
     m_tempoSeekPending = true;
   }
 
