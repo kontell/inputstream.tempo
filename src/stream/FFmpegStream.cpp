@@ -345,21 +345,6 @@ bool FFmpegStream::CheckAndUpdateInitialSeekHold()
 
 DEMUX_PACKET* FFmpegStream::DemuxRead()
 {
-  // Initial seek hold: gate all output until the caller's resume seek
-  // arrives (cleared in SeekTime) or the timeout expires.
-  if (m_tempoEnabled && CheckAndUpdateInitialSeekHold())
-  {
-    // Short yield so the demuxing thread doesn't spin hot while waiting.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    DEMUX_PACKET* empty = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(0);
-    if (empty)
-    {
-      empty->iSize = 0;
-      empty->iStreamId = 0;
-    }
-    return empty;
-  }
-
   // Return buffered tempo-processed packets first
   if (m_tempoEnabled && !m_tempoOutputQueue.empty())
   {
@@ -1577,7 +1562,12 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
   // Reset tempo pipeline on seek. Set m_tempoSeekPending so the first raw
   // audio packet after seek initialises m_tempoOutputPts from its actual DTS
   // (av_seek_frame may land at a different position than requested, especially
-  // for MP3 VBR).
+  // for MP3 VBR). Also rebuild the atempo filter graph — atempo keeps
+  // internal sample history across flushes, so after a seek the first post-
+  // seek frames blend residual samples from the pre-seek position with the
+  // new input. Audible as a brief click/glitch at stream start (where
+  // PAPlayer's init SeekTime(0) immediately follows the first emit) and at
+  // any user-triggered seek.
   if (m_tempoEnabled && m_audioDecoderCtx)
   {
     avcodec_flush_buffers(m_audioDecoderCtx);
@@ -1586,6 +1576,7 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
       m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
       m_tempoOutputQueue.pop();
     }
+    BuildFilterGraph(m_currentTempo);
     m_tempoSeekPending = true;
   }
 
@@ -3056,7 +3047,15 @@ void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
         DEMUX_PACKET* outPkt = m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(pcmSize);
         if (outPkt)
         {
-          memcpy(outPkt->pData, m_filteredFrame->data[0], pcmSize);
+          // During the initial seek hold, emit silence instead of the
+          // stream-start PCM. Packets still flow so Kodi's format detection,
+          // codec init, and SeekTime's wait-for-pts loop all succeed; the
+          // sink just plays zeros until PAPlayer's bookmark seek lands
+          // (which flushes the queue via SeekTime and resumes real audio).
+          if (m_initialSeekHoldActive && CheckAndUpdateInitialSeekHold())
+            memset(outPkt->pData, 0, pcmSize);
+          else
+            memcpy(outPkt->pData, m_filteredFrame->data[0], pcmSize);
           outPkt->iSize = pcmSize;
           outPkt->iStreamId = stream->index;
 

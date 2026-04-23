@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="0.3.6"
+  version="0.3.7"
   name="Inputstream Tempo"
   provider-name="konell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with audio tempo control (pitch-corrected playback speed)</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in audio tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts. Based on inputstream.ffmpegdirect.</description>
-    <news>v0.3.6 Initial seek hold: when the caller sets inputstream.tempo.start_time, DemuxRead returns empty packets until the caller's bookmark seek arrives (or a 2s safety timeout), so PAPlayer's sink can't play pre-roll from pts=0 before the seek lands.</news>
+    <news>v0.3.7 Fix v0.3.6 resume regression (decoder init was starved by the empty-packet hold — now zero-fills PCM during the hold instead). Also rebuild the atempo filter graph on seek so residual filter state doesn't bleed into post-seek audio (fixes the click at stream start from PAPlayer's init SeekTime(0)).</news>
   </extension>
 </addon>
