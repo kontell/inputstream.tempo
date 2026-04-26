@@ -122,10 +122,11 @@ DEMUX_PACKET* FFmpegCatchupStream::DemuxRead()
     {
       if (!m_lastPacketWasAvoidedEOF)
       {
-        Log(LOGLEVEL_INFO, "%s - EOF detected on terminating catchup stream, starting continuing stream at offset: %lld, ending offset approx %lld", __FUNCTION__, m_previousLiveBufferOffset, static_cast<long long>(std::time(nullptr) - m_catchupBufferStartTime));
+        long long currentDemuxSecs = static_cast<long long>(m_currentDemuxTime) / 1000;
+        Log(LOGLEVEL_INFO, "%s - EOF detected on terminating catchup stream, starting continuing stream at offset: %lld, ending offset approx %lld", __FUNCTION__, currentDemuxSecs, static_cast<long long>(std::time(nullptr) - m_catchupBufferStartTime));
 
         m_seekCorrectsEOF = true;
-        DemuxSeekTime(m_previousLiveBufferOffset * 1000);
+        DemuxSeekTime(m_currentDemuxTime);
         m_seekCorrectsEOF = false;
       }
       m_lastPacketWasAvoidedEOF = true;

@@ -77,8 +77,8 @@ protected:
 
   bool m_isOpeningStream;
   double m_seekOffset;
-  double m_pauseStartTime;
-  double m_currentDemuxTime;
+  double m_pauseStartTime = 0;
+  double m_currentDemuxTime = 0;
 
   long long m_previousLiveBufferOffset = 0;
   bool m_lastSeekWasLive = false;
