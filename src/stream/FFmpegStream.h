@@ -253,6 +253,20 @@ private:
   static constexpr std::chrono::milliseconds kInitialSeekHoldTimeout{2000};
   bool CheckAndUpdateInitialSeekHold();
 
+  // Dynamic ptsStart for the ITimes/GetTimes branch. At non-1× tempo, the
+  // packet pts/dts are in OUTPUT time (for ActiveAE sync), which means
+  // VideoPlayer's m_clock.GetClock() advances at output rate. To make the
+  // OSD track CONTENT time, GetTimes needs to report a ptsStart that lags
+  // wallclock at the (1 − 1/tempo) rate. We compute it at packet pop:
+  // ptsStart = output_pts_of_just_popped - content_pts_of_just_popped.
+  // Then state.time = clock − ptsStart ≈ content_pts, which is what the
+  // user wants on the OSD. Reading at POP time (not emit time) keeps us
+  // bounded by Kodi's consumption — v0.3.4's emit-counter version drifted
+  // ahead of reality and state.time blew up.
+  double m_ptsStartDynamic = 0.0;
+  bool m_ptsStartDynamicValid = false;
+  void UpdatePtsStartFromPop(const DEMUX_PACKET* pkt);
+
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();
   bool BuildFilterGraph(double tempo);

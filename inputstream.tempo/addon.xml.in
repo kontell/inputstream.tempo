@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="0.3.8"
+  version="0.3.9"
   name="Inputstream Tempo"
   provider-name="konell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with audio tempo control (pitch-corrected playback speed)</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in audio tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts. Based on inputstream.ffmpegdirect.</description>
-    <news>v0.3.8 Only rebuild the atempo filter graph on startup seeks — unconditional rebuild on user-initiated seeks caused an audible pause (brief gap in the emit stream). Threshold on m_tempoEmittedPackets keeps the stream-start click fix while letting mid-stream seeks flow without the rebuild cost.</news>
+    <news>v0.3.9 VideoPlayer OSD tracks content time at non-1× tempo (YouTube + audio-only + VideoPlayer route). GetTimes now returns a dynamic ptsStart derived from consumed-packet pts/dispTime, so state.time = clock − ptsStart ≈ content_pts instead of wall-clock.</news>
   </extension>
 </addon>

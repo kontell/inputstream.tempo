@@ -314,6 +314,7 @@ void FFmpegStream::DemuxFlush()
     m_tempoEmittedPackets = 0;
     m_tempoFirstEmitWall = std::chrono::steady_clock::time_point{};
     m_tempoCumulativeOutputSecs = 0.0;
+    m_ptsStartDynamicValid = false;
   }
 
   m_currentPts = STREAM_NOPTS_VALUE;
@@ -324,6 +325,18 @@ void FFmpegStream::DemuxFlush()
   m_displayTime = 0;
   m_dtsAtDisplayTime = STREAM_NOPTS_VALUE;
   m_seekToKeyFrame = false;
+}
+
+void FFmpegStream::UpdatePtsStartFromPop(const DEMUX_PACKET* pkt)
+{
+  if (!pkt || !m_tempoEnabled)
+    return;
+  // outPkt->pts is in STREAM_TIME_BASE (μs), output rate;
+  // outPkt->dispTime is in ms, content rate.
+  // ptsStart = output − content keeps state.time = clock − ptsStart ≈ content.
+  const double contentPts = STREAM_MSEC_TO_TIME(pkt->dispTime);
+  m_ptsStartDynamic = pkt->pts - contentPts;
+  m_ptsStartDynamicValid = true;
 }
 
 bool FFmpegStream::CheckAndUpdateInitialSeekHold()
@@ -361,6 +374,13 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
         queued->demuxerId = m_demuxerId;
       }
     }
+
+    UpdatePtsStartFromPop(queued);
+    // Keep m_currentPts tracking consumed content (GetTime()) in sync on
+    // this pop path too — previously only the inner path did this.
+    const double contentPts = STREAM_MSEC_TO_TIME(queued->dispTime);
+    if (contentPts > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE)
+      m_currentPts = contentPts;
 
     return queued;
   }
@@ -501,6 +521,7 @@ DEMUX_PACKET* FFmpegStream::DemuxRead()
             {
               m_currentPts = contentPts;
             }
+            UpdatePtsStartFromPop(pPacket);
           }
           else
           {
@@ -697,24 +718,29 @@ int FFmpegStream::GetTime()
 
 bool FFmpegStream::GetTimes(kodi::addon::InputstreamTimes& times)
 {
-  // Always report static ptsStart=0, ptsEnd=duration. At non-1x tempo this
-  // makes the OSD tick at wall-clock rate instead of content rate — but
-  // keeping audio flowing is higher priority right now. Both IDisplayTime
-  // (v0.3.3/v0.3.5) and dynamic ITimes (v0.3.4) routes broke audio playback
-  // in ways I don't yet understand (state.time blows up to absurd values in
-  // Kodi's UpdatePlayState). Revert to the v0.3.2 behavior that had working
-  // audio; OSD-follows-tempo needs a separate, better fix.
-  if (!IsRealTimeStream())
-  {
-    times.SetStartTime(0);
-    times.SetPtsStart(0);
-    times.SetPtsBegin(0);
-    times.SetPtsEnd(m_pFormatContext->duration);
+  if (IsRealTimeStream())
+    return false;
 
-    return true;
-  }
+  // Dynamic ptsStart at non-1× tempo so VideoPlayer's OSD tracks CONTENT
+  // time, not wall-clock. VideoPlayer computes
+  //   state.time = m_clock.GetClock() − ptsStart
+  // and m_clock advances at OUTPUT rate (because packet pts/dts are
+  // output-rate for ActiveAE sync). We set ptsStart = output − content
+  // (updated on each pop of a tempo packet), so
+  //   state.time ≈ output_clock − (output − content) = content.
+  //
+  // At tempo == 1.0 the two rates are equal → ptsStart collapses to 0 and
+  // this matches the legacy static path. Keep this branch active whenever
+  // tempo is enabled so the transition at 1.0↔non-1.0 is seamless.
+  const bool useDynamic =
+      m_tempoEnabled && m_ptsStartDynamicValid;
+  const double ptsStart = useDynamic ? m_ptsStartDynamic : 0.0;
 
-  return false;
+  times.SetStartTime(0);
+  times.SetPtsStart(ptsStart);
+  times.SetPtsBegin(ptsStart);
+  times.SetPtsEnd(ptsStart + m_pFormatContext->duration);
+  return true;
 }
 
 bool FFmpegStream::PosTime(int ms)
@@ -1581,6 +1607,9 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
     if (m_tempoEmittedPackets < 10)
       BuildFilterGraph(m_currentTempo);
     m_tempoSeekPending = true;
+    // ptsStart is derived from output/content PTS of consumed packets;
+    // after seek both reset, so the old delta is stale.
+    m_ptsStartDynamicValid = false;
   }
 
   m_pkt.result = -1;
