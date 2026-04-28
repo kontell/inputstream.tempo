@@ -2820,6 +2820,33 @@ bool FFmpegStream::InitTempoProcessing(AVStream* audioStream)
     return false;
   }
 
+  // FFmpeg 6's matroska/webm demuxer leaves codec-context sample_rate /
+  // ch_layout unpopulated for Opus until the first packet decodes —
+  // codecpar has the values, the context doesn't. FFmpeg 7 fills them
+  // up front. Backfill from codecpar so BuildFilterGraph below can build
+  // valid abuffer args (otherwise time_base=1/0 → "Value inf" → fail).
+  if (m_audioDecoderCtx->sample_rate <= 0 &&
+      audioStream->codecpar->sample_rate > 0)
+  {
+    m_audioDecoderCtx->sample_rate = audioStream->codecpar->sample_rate;
+    Log(LOGLEVEL_INFO,
+        "Tempo: backfilled codec sample_rate from codecpar (%d Hz) — "
+        "FFmpeg %d.x demuxer didn't set it after avcodec_open2",
+        audioStream->codecpar->sample_rate, LIBAVFORMAT_VERSION_MAJOR);
+  }
+  if (m_audioDecoderCtx->ch_layout.nb_channels <= 0 &&
+      audioStream->codecpar->ch_layout.nb_channels > 0)
+  {
+    av_channel_layout_copy(&m_audioDecoderCtx->ch_layout,
+                           &audioStream->codecpar->ch_layout);
+  }
+  if (m_audioDecoderCtx->sample_fmt == AV_SAMPLE_FMT_NONE)
+  {
+    // Opus always outputs flt/fltp. Pick fltp as a sensible default;
+    // the decoder will use whatever it actually emits at runtime.
+    m_audioDecoderCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+  }
+
   m_decodedFrame = av_frame_alloc();
   m_filteredFrame = av_frame_alloc();
   if (!m_decodedFrame || !m_filteredFrame)
@@ -2832,7 +2859,17 @@ bool FFmpegStream::InitTempoProcessing(AVStream* audioStream)
 
   if (!BuildFilterGraph(m_currentTempo))
   {
+    // BuildFilterGraph cleans up its own AVFilterGraph but the codec
+    // context, frames, and m_tempoAudioStreamIndex must be reset too —
+    // otherwise the demux path keeps routing this stream's packets
+    // through ProcessAudioPacketWithTempo and dereferences the freed
+    // m_audioDecoderCtx → segfault.
     DestroyTempoProcessing();
+    m_tempoAudioStreamIndex = -1;
+    m_tempoEnabled = false;
+    Log(LOGLEVEL_WARNING,
+        "Tempo: filter init failed — falling back to passthrough "
+        "(no tempo / no OSD fix for this stream)");
     return false;
   }
 
@@ -3005,6 +3042,15 @@ void FFmpegStream::CheckTempoFileUpdate()
 
 void FFmpegStream::ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream)
 {
+  // Belt-and-braces: if init failed earlier (e.g. BuildFilterGraph couldn't
+  // build abuffer because of FFmpeg-version-specific codec quirks), the
+  // demux dispatcher should already have skipped this path — but defend
+  // against any caller that still routes a packet here, since dereferencing
+  // m_audioDecoderCtx after DestroyTempoProcessing is a hard segfault.
+  if (!m_audioDecoderCtx || !m_filterGraph || !m_bufferSrcCtx ||
+      !m_bufferSinkCtx || !m_decodedFrame || !m_filteredFrame)
+    return;
+
   // After a seek, anchor both PTS streams to the raw packet's actual DTS so
   // downstream state reflects where av_seek_frame really landed, not where we
   // requested. Critical for MP3 VBR where seeks can be imprecise.
