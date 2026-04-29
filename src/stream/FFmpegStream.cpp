@@ -2116,6 +2116,20 @@ DemuxStream* FFmpegStream::AddStream(int streamIdx)
       return nullptr;
     }
 
+    // Audiobook m4b/mp3 files often carry the cover art as an attached-pic
+    // mjpeg stream. Surfacing it as a regular video stream causes VideoPlayer
+    // to spin up its video pipeline; the stream then fails its OpenStream
+    // ("Unsupported stream") and the player wedges in caching state 2 — audio
+    // packets keep emitting but the audio thread stays paused waiting on a
+    // video sync that never arrives. Discarding here keeps GetStreamIds
+    // audio-only so VideoPlayer never starts the video pipeline.
+    if (pStream->disposition & AV_DISPOSITION_ATTACHED_PIC)
+    {
+      Log(LOGLEVEL_DEBUG, "CDVDDemuxFFmpeg::AddStream - discarding attached_pic stream");
+      pStream->discard = AVDISCARD_ALL;
+      return nullptr;
+    }
+
     DemuxStream* stream = nullptr;
 
     switch (pStream->codecpar->codec_type)
