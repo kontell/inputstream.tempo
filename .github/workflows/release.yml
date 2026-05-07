@@ -3,6 +3,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Skip release creation — run the build matrix only'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -12,26 +17,29 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           # Linux x86_64
-          - { name: "Linux x86_64 / Kodi 21", os: linux, arch: x86_64, kodi: 21, kodi_branch: Omega }
-          - { name: "Linux x86_64 / Kodi 22", os: linux, arch: x86_64, kodi: 22, kodi_branch: master }
+          - { name: "Linux x86_64 / Kodi 21", os: linux, arch: x86_64, kodi: 21, kodi_branch: Omega, runner: ubuntu-latest }
+          - { name: "Linux x86_64 / Kodi 22", os: linux, arch: x86_64, kodi: 22, kodi_branch: master, runner: ubuntu-latest }
           # Linux armv7
-          - { name: "Linux armv7 / Kodi 21", os: linux, arch: armv7, kodi: 21, kodi_branch: Omega, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
-          - { name: "Linux armv7 / Kodi 22", os: linux, arch: armv7, kodi: 22, kodi_branch: master, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
+          - { name: "Linux armv7 / Kodi 21", os: linux, arch: armv7, kodi: 21, kodi_branch: Omega, runner: ubuntu-latest, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
+          - { name: "Linux armv7 / Kodi 22", os: linux, arch: armv7, kodi: 22, kodi_branch: master, runner: ubuntu-latest, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
           # Linux aarch64
-          - { name: "Linux aarch64 / Kodi 21", os: linux, arch: aarch64, kodi: 21, kodi_branch: Omega, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
-          - { name: "Linux aarch64 / Kodi 22", os: linux, arch: aarch64, kodi: 22, kodi_branch: master, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
+          - { name: "Linux aarch64 / Kodi 21", os: linux, arch: aarch64, kodi: 21, kodi_branch: Omega, runner: ubuntu-latest, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
+          - { name: "Linux aarch64 / Kodi 22", os: linux, arch: aarch64, kodi: 22, kodi_branch: master, runner: ubuntu-latest, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
           # Android armv7
-          - { name: "Android armv7 / Kodi 21", os: android, arch: armv7, kodi: 21, kodi_branch: Omega }
-          - { name: "Android armv7 / Kodi 22", os: android, arch: armv7, kodi: 22, kodi_branch: master }
+          - { name: "Android armv7 / Kodi 21", os: android, arch: armv7, kodi: 21, kodi_branch: Omega, runner: ubuntu-latest }
+          - { name: "Android armv7 / Kodi 22", os: android, arch: armv7, kodi: 22, kodi_branch: master, runner: ubuntu-latest }
           # Android aarch64
-          - { name: "Android aarch64 / Kodi 21", os: android, arch: aarch64, kodi: 21, kodi_branch: Omega }
-          - { name: "Android aarch64 / Kodi 22", os: android, arch: aarch64, kodi: 22, kodi_branch: master }
+          - { name: "Android aarch64 / Kodi 21", os: android, arch: aarch64, kodi: 21, kodi_branch: Omega, runner: ubuntu-latest }
+          - { name: "Android aarch64 / Kodi 22", os: android, arch: aarch64, kodi: 22, kodi_branch: master, runner: ubuntu-latest }
+          # Windows x86_64
+          - { name: "Windows x86_64 / Kodi 21", os: windows, arch: x86_64, kodi: 21, kodi_branch: Omega, runner: windows-2022 }
+          - { name: "Windows x86_64 / Kodi 22", os: windows, arch: x86_64, kodi: 22, kodi_branch: master, runner: windows-2022 }
     name: ${{ matrix.name }}
     steps:
     - name: Checkout addon
@@ -54,7 +62,8 @@ jobs:
         sparse-checkout-cone-mode: false
         fetch-depth: 1
 
-    - name: Install dependencies
+    - name: Install dependencies (Linux/Android)
+      if: matrix.os != 'windows'
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y autopoint nasm ${{ matrix.cross_pkgs }}
@@ -72,7 +81,8 @@ jobs:
         fi
         echo "ndk-path=$NDK_DIR" >> $GITHUB_OUTPUT
 
-    - name: Build
+    - name: Build (Linux/Android)
+      if: matrix.os != 'windows'
       run: |
         ${{ github.workspace }}/${app_id}/scripts/build.sh \
           --os ${{ matrix.os }} \
@@ -83,6 +93,35 @@ jobs:
           --output ${{ github.workspace }}/artifacts \
           --jobs $(getconf _NPROCESSORS_ONLN)
 
+    - name: Build (Windows)
+      if: matrix.os == 'windows'
+      shell: bash
+      run: |
+        WS="$(pwd -W)"
+        # Register addon
+        mkdir -p xbmc/cmake/addons/addons/${app_id}
+        echo "${app_id} ${WS}/${app_id}" > xbmc/cmake/addons/addons/${app_id}/${app_id}.txt
+
+        cmake \
+          -B "${app_id}/build" \
+          -G "Visual Studio 17 2022" -A x64 -T host=x64 \
+          -DADDONS_TO_BUILD="${app_id}" \
+          -DADDON_SRC_PREFIX="${WS}" \
+          -DADDONS_DEFINITION_DIR="${WS}/xbmc/cmake/addons/addons" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="${WS}/install" \
+          -DPACKAGE_ZIP=1 \
+          "${WS}/xbmc/cmake/addons"
+        cmake --build "${app_id}/build" --config Release --target "${app_id}"
+
+        # Package: zip up the installed addon directory matching build.sh's naming.
+        # Git Bash on windows-2022 doesn't ship `zip`; 7z is pre-installed.
+        VERSION=$(grep '^ *version=' "${app_id}/${app_id}/addon.xml.in" | head -1 | sed 's/.*version="\([^"]*\)".*/\1/')
+        ZIP_NAME="${app_id}-${VERSION}-windows-${{ matrix.arch }}-kodi${{ matrix.kodi }}.zip"
+        mkdir -p artifacts
+        cd install
+        7z a -tzip "${WS}/artifacts/${ZIP_NAME}" "${app_id}/"
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
@@ -92,7 +131,9 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true')
     steps:
     - name: Checkout addon (for version)
       uses: actions/checkout@v5
