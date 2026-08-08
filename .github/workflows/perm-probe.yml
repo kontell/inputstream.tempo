@@ -2,6 +2,10 @@
 name: Perm probe
 on:
   workflow_dispatch:
+    inputs:
+      probe_tag:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -13,10 +17,11 @@ jobs:
       - name: Try to create a draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROBE_TAG: ${{ inputs.probe_tag }}
         run: |
           set -uo pipefail
           echo "ref=$GITHUB_REF  sha=$GITHUB_SHA"
-          tag="perm-probe-${GITHUB_RUN_ID}"
+          tag="${PROBE_TAG:-perm-probe-${GITHUB_RUN_ID}}"
           code=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
             -f tag_name="$tag" -f name="$tag" -F draft=true \
             -f target_commitish="$GITHUB_SHA" \
