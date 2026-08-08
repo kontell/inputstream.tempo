@@ -125,8 +125,9 @@ jobs:
     # than either of the alternatives: without this the whole release fails and no
     # platform ships, and without if-no-files-found: error below it goes green and
     # nobody learns. The job will show as failed; the release still drafts with the
-    # platforms that do build. Flip this off and set the expected count to 12 in
-    # the release job once Windows attaches a zip.
+    # platforms that do build. Once Windows attaches a zip: drop this line, move
+    # windows-x86_64 from known_missing to required in the release job, and add it
+    # to inputstream.tempo's platforms in repository.kontell/addons.toml.
     continue-on-error: true
     strategy:
       fail-fast: false
