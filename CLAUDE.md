@@ -85,4 +85,17 @@ The `scripts/build.sh` handles cross-compilation for Linux ARM and Android:
 ./scripts/build.sh --os android --arch armv7 --kodi 22 --kodi-src ~/xbmc --ndk ~/android-ndk-r25c
 ```
 
-GitHub Actions: `build.yml` (GCC+Clang × Omega+master on push), `release.yml` (10-platform matrix on v* tag → draft release).
+## CI and releases
+
+This branch is **Omega** and builds **Kodi 21 only**; the other channel is the `Piers` branch at `22.y.z`. Versions here are `21.y.z` and tags are `v21.y.z` — the major carries the Kodi version, which is what `repository.kontell` uses to file a build under `omega/` or `piers/`.
+
+- `ci.yml` — every PR and push: gcc/clang/msvc compile checks plus a `package` job uploading an installable PR zip.
+- `release.yml` — on a `v21.*` tag: 6-platform matrix, then a draft release. Asserts the tag matches `addon.xml.in` and that its major is 21.
+- `drift.yml` — weekly: asserts upstream's declared ABI floor is still one our pinned build satisfies.
+- `notify-repo.yml` — announces a published release to `repository.kontell`. Publish the draft yourself; one published by a workflow using the default `GITHUB_TOKEN` raises no event.
+
+Kodi is pinned at `21.3-Omega` rather than tracking a branch: `@ADDON_DEPENDS@` is filled from those headers, so an unpinned ref moves the declared `kodi.binary.instance.inputstream` version with no commit here. **The inputstream ABI has no cushion on either channel** (MIN equals current, 3.3.0 on Omega and 3.4.0 on Piers), so any upstream bump immediately splits the pinned build from current Kodi — `drift.yml` watches for it.
+
+**Windows builds are broken and the failure is deliberately visible.** They compile successfully and upload nothing, because `actions/upload-artifact` defaults to `if-no-files-found: warn`: v0.3.11 attached 10 assets from 12 green jobs, and `piers/inputstream.tempo+windows-x86_64` has never existed in the served repository. The job is `continue-on-error` so releases still ship the platforms that work; the release step warns by name, and lists the three places to change once it is fixed.
+
+Unlike `pvr.kofin`, the Linux builds are **not** in a pinned container yet — this addon builds FFmpeg plus gnutls, nettle, gmp, iconv and libzvbi through autotools, which is far more dependency surface to move into a bare image. The runner label is pinned meanwhile.
