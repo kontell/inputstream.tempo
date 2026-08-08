@@ -1,3 +1,7 @@
+v22.3.11
+- Renumbered to Kodi's add-on versioning: the first number is now the Kodi version a build is for, so 22.x.y is Kodi 22 (Piers) and 21.x.y is Kodi 21 (Omega). The add-on itself is unchanged from v0.3.11 — only the numbering and the build system moved
+- Kodi 21 and Kodi 22 now build from separate branches and are released separately, so a fix can ship to one without waiting for the other
+
 v0.3.5
 - Revert v0.3.4 dynamic ptsStart. That approach read state from internal
   m_tempoOutputPts/m_tempoContentPts counters that advance on packet
