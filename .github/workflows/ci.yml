@@ -158,19 +158,6 @@ jobs:
             "${WS}/xbmc/cmake/addons"
           cmake --build "${app_id}/build" --config Release --target "${app_id}"
 
-      - name: Did the install tree appear?
-        shell: bash
-        run: |
-          set -uo pipefail
-          # The open question behind the missing Windows release assets: the build
-          # reports success, but no zip reaches the release. This says plainly
-          # whether an installable tree exists after a green build, which is the
-          # first thing to know. Informational here; release.yml treats a missing
-          # Windows zip as a tracked failure rather than a silent absence.
-          echo "--- output/ ---"; ls -la output 2>/dev/null || echo "(no output/)"
-          echo "--- output/${app_id} ---"; ls -la "output/${app_id}" 2>/dev/null || echo "(absent)"
-          echo "--- any zip anywhere ---"; find . -name '*.zip' -not -path './xbmc/*' 2>/dev/null | head
-
   # Every artifact a release produces, built the same way. Previously this was
   # one linux-x86_64 zip, which left armv7, aarch64 and Android — the NDK path
   # especially — entirely unbuilt until release time. The cross-builds are
