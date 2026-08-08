@@ -111,7 +111,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.app_id }}-${{ matrix.os }}-${{ matrix.arch }}-kodi${{ matrix.kodi }}
+          name: ${{ env.app_id }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ github.workspace }}/artifacts/*.zip
           # Not the default (warn). This addon is the reason the default matters:
           # v0.3.11 attached 10 assets from 12 green jobs because the Windows jobs
@@ -176,7 +176,7 @@ jobs:
           cmake --build "${app_id}/build" --config Release --target "${app_id}"
 
           VERSION=$(grep '^ *version=' "${app_id}/${app_id}/addon.xml.in" | head -1 | sed 's/.*version="\([^"]*\)".*/\1/')
-          ZIP_NAME="${app_id}-${VERSION}-windows-x86_64-kodi${{ matrix.kodi }}.zip"
+          ZIP_NAME="${app_id}-${VERSION}-windows-x86_64.zip"
           mkdir -p artifacts
           # This is the diagnostic that was missing. The build reports success but
           # no zip ever reached a release, so say plainly what the install step
@@ -195,7 +195,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.app_id }}-windows-x86_64-kodi${{ matrix.kodi }}
+          name: ${{ env.app_id }}-windows-x86_64
           path: ${{ github.workspace }}/artifacts/*.zip
           if-no-files-found: error
 
@@ -290,31 +290,33 @@ jobs:
           find artifacts -mindepth 1 -type d -empty -delete
           ls -la artifacts/
 
-          # Every platform that must be present, per Kodi version. Windows is
-          # listed separately because it is a known gap being tracked, not because
-          # it is optional: its absence warns loudly rather than passing silently,
-          # and anything else missing fails the release.
+          # Every platform this branch must produce. It builds one Kodi version,
+          # so there is no loop over channels — the previous `for kodi in 21 22`
+          # survived the channel split and would have failed every release looking
+          # for the other channel's zips.
+          #
+          # Windows is listed separately because it is a known gap being tracked,
+          # not because it is optional: its absence warns loudly rather than
+          # passing silently, and anything else missing fails the release.
           required=(linux-x86_64 linux-armv7 linux-aarch64 android-armv7 android-aarch64)
           known_missing=(windows-x86_64)
           status=0
-          for kodi in 21 22; do
-            for plat in "${required[@]}"; do
-              if ! ls artifacts/${app_id}-*-${plat}-kodi${kodi}.zip >/dev/null 2>&1; then
-                echo "::error::missing ${plat} for Kodi ${kodi}" >&2
-                status=1
-              fi
-            done
-            for plat in "${known_missing[@]}"; do
-              if ! ls artifacts/${app_id}-*-${plat}-kodi${kodi}.zip >/dev/null 2>&1; then
-                echo "::warning::${plat} for Kodi ${kodi} is absent — the tracked" \
-                     "Windows gap. This release will not serve Windows users." >&2
-              else
-                echo "::notice::${plat} for Kodi ${kodi} is present — the Windows gap" \
-                     "is fixed. Move it out of known_missing here, drop" \
-                     "continue-on-error from build-windows, and add windows-x86_64 to" \
-                     "inputstream.tempo's platforms in repository.kontell/addons.toml." >&2
-              fi
-            done
+          for plat in "${required[@]}"; do
+            if ! ls artifacts/${app_id}-*-${plat}.zip >/dev/null 2>&1; then
+              echo "::error::missing ${plat}" >&2
+              status=1
+            fi
+          done
+          for plat in "${known_missing[@]}"; do
+            if ! ls artifacts/${app_id}-*-${plat}.zip >/dev/null 2>&1; then
+              echo "::warning::${plat} is absent — the tracked Windows gap. This" \
+                   "release will not serve Windows users." >&2
+            else
+              echo "::notice::${plat} is present — the Windows gap is fixed. Move it" \
+                   "out of known_missing here, drop continue-on-error from" \
+                   "build-windows, and add windows-x86_64 to inputstream.tempo's" \
+                   "platforms in repository.kontell/addons.toml." >&2
+            fi
           done
           echo "zips: $(find artifacts -name '*.zip' | wc -l)"
           exit $status
