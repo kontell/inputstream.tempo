@@ -8,8 +8,16 @@ name: CI
 
 on:
   push:
-    branches: [Piers, Omega]
+    branches: [Piers]
   pull_request:
+
+# Supersede a PR's in-flight run when it is pushed to again. With the full
+# platform matrix a single PR is a dozen jobs, and on inputstream.tempo each is
+# ten minutes of FFmpeg — paying twice for a superseded commit is pure waste.
+# Never applied to branch pushes: those are what release tags are cut from.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -31,8 +39,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cc: gcc, cxx: g++, channel: Omega, kodi: 21 }
-          - { cc: clang, cxx: clang++, channel: Omega, kodi: 21 }
           - { cc: gcc, cxx: g++, channel: Piers, kodi: 22 }
           - { cc: clang, cxx: clang++, channel: Piers, kodi: 22 }
     steps:
@@ -96,7 +102,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { channel: Omega, kodi: 21 }
           - { channel: Piers, kodi: 22 }
     steps:
       - name: Checkout addon
@@ -151,15 +156,36 @@ jobs:
           echo "--- output/${app_id} ---"; ls -la "output/${app_id}" 2>/dev/null || echo "(absent)"
           echo "--- any zip anywhere ---"; find . -name '*.zip' -not -path './xbmc/*' 2>/dev/null | head
 
-  package:
-    name: package (linux x86_64, ${{ matrix.channel }})
+  # Every artifact a release produces, built the same way. Previously this was
+  # one linux-x86_64 zip, which left armv7, aarch64 and Android — the NDK path
+  # especially — entirely unbuilt until release time. The cross-builds are
+  # 45-110s each on pvr.kofin, so the coverage is close to free there.
+  #
+  # The matrices below are copied from release.yml and checked against it, so a
+  # platform added to one cannot silently be missing from the other.
+  package-linux:
+    name: package (${{ matrix.os }} ${{ matrix.arch }}, ${{ matrix.channel }})
+    # NOT built in a pinned container, unlike pvr.kofin, and that is a staging
+    # decision rather than an oversight. This addon builds FFmpeg plus gnutls,
+    # nettle, gmp, iconv and libzvbi from source through autotools, with
+    # cross-compile quirks documented in CLAUDE.md — a much larger dependency
+    # surface to move into a bare image, and one that cannot be verified without
+    # running it. pvr.kofin's container (four build tools) goes first; this
+    # follows once that has proven itself over a release or two.
+    #
+    # Meanwhile the runner label is pinned, which is what stops the floor moving
+    # when GitHub remaps ubuntu-latest. The ABI assertion below is what will say
+    # whether the floor is actually acceptable on this image.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { channel: Omega, kodi: 21 }
-          - { channel: Piers, kodi: 22 }
+          - { os: linux, arch: x86_64, channel: Piers, kodi: 22 }
+          - { os: linux, arch: armv7, channel: Piers, kodi: 22, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
+          - { os: linux, arch: aarch64, channel: Piers, kodi: 22, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
+          - { os: android, arch: armv7, channel: Piers, kodi: 22 }
+          - { os: android, arch: aarch64, channel: Piers, kodi: 22 }
     steps:
       - name: Checkout addon
         uses: actions/checkout@v5
@@ -182,53 +208,134 @@ jobs:
           fetch-depth: 1
 
       - name: Install dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y autopoint nasm
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y autopoint nasm ${{ matrix.cross_pkgs }}
+
+      - name: Setup Android NDK
+        if: matrix.os == 'android'
+        id: setup-ndk
+        run: |
+          NDK_VERSION=r25c
+          NDK_DIR="$HOME/android-ndk-${NDK_VERSION}"
+          if [ ! -d "$NDK_DIR" ]; then
+            wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip" -O /tmp/ndk.zip
+            unzip -q /tmp/ndk.zip -d "$HOME"
+            rm /tmp/ndk.zip
+          fi
+          echo "ndk-path=$NDK_DIR" >> $GITHUB_OUTPUT
 
       - name: Build
         env:
-          LDFLAGS: "-static-libstdc++ -static-libgcc"
+          # Static C++ runtime on Linux so the .so depends only on glibc, not on a
+          # GLIBCXX_3.4.x the target lacks. The superbuild forwards CMAKE_C/CXX_FLAGS
+          # but not linker flags, hence LDFLAGS. Empty on Android (NDK's own STL).
+          LDFLAGS: ${{ matrix.os == 'linux' && '-static-libstdc++ -static-libgcc' || '' }}
         run: |
           ${{ github.workspace }}/${app_id}/scripts/build.sh \
-            --os linux --arch x86_64 --kodi ${{ matrix.kodi }} \
+            --os ${{ matrix.os }} \
+            --arch ${{ matrix.arch }} \
+            --kodi ${{ matrix.kodi }} \
             --kodi-src ${{ github.workspace }}/xbmc \
+            ${{ matrix.os == 'android' && format('--ndk {0}', steps.setup-ndk.outputs.ndk-path) || '' }} \
             --output ${{ github.workspace }}/artifacts \
             --jobs $(getconf _NPROCESSORS_ONLN)
 
-      - name: Report the ABI floor
-        # Reported, not enforced, on PRs — release.yml enforces it. See the note
-        # in release.yml about why this addon is not yet built in a pinned
-        # container the way pvr.kofin is.
-        continue-on-error: true
+      - name: Assert the ABI floor
         run: |
           ${{ github.workspace }}/${app_id}/scripts/check-abi.sh \
-            ${{ github.workspace }}/artifacts
-
-      - name: Name zip for this run
-        id: name
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          zips=(${{ github.workspace }}/artifacts/*.zip)
-          if [[ ${#zips[@]} -ne 1 ]]; then
-            echo "expected exactly one zip, got: ${zips[*]:-none}" >&2
-            exit 1
-          fi
-          src="${zips[0]}"
-          base="$(basename "$src" .zip)"
-          sha7="$(echo "${{ github.sha }}" | cut -c1-7)"
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            dest="$(dirname "$src")/${base}-pr${{ github.event.pull_request.number }}-${sha7}.zip"
-          else
-            dest="$(dirname "$src")/${base}-${{ github.ref_name }}-${sha7}.zip"
-          fi
-          mv "$src" "$dest"
-          echo "zip=$dest" >> "$GITHUB_OUTPUT"
+            ${{ github.workspace }}/artifacts "${{ env.max_glibc }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.app_id }}-${{ matrix.channel }}-pr-zip
-          path: ${{ steps.name.outputs.zip }}
+          name: ${{ env.app_id }}-${{ matrix.os }}-${{ matrix.arch }}-pr
           retention-days: 14
+          path: ${{ github.workspace }}/artifacts/*.zip
+          # Not the default (warn). This addon is the reason the default matters:
+          # v0.3.11 attached 10 assets from 12 green jobs because the Windows jobs
+          # uploaded nothing and warn is not a failure.
           if-no-files-found: error
+
+  package-windows:
+    name: package (windows x86_64, ${{ matrix.channel }})
+    runs-on: windows-2022
+    # Tolerated because it is already broken, and tolerating it visibly is better
+    # than either of the alternatives: without this the whole release fails and no
+    # platform ships, and without if-no-files-found: error below it goes green and
+    # nobody learns. The job will show as failed; the release still drafts with the
+    # platforms that do build. Once Windows attaches a zip: drop this line, move
+    # windows-x86_64 from known_missing to required in the release job, and add it
+    # to inputstream.tempo's platforms in repository.kontell/addons.toml.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { channel: Piers, kodi: 22 }
+    steps:
+      - name: Checkout addon
+        uses: actions/checkout@v5
+        with:
+          path: ${{ env.app_id }}
+
+      - name: Checkout Kodi
+        uses: actions/checkout@v5
+        with:
+          repository: xbmc/xbmc
+          ref: ${{ matrix.channel == 'Omega' && env.kodi_omega_ref || env.kodi_piers_ref }}
+          path: xbmc
+          sparse-checkout: |
+            version.txt
+            xbmc/interfaces/json-rpc/schema/version.txt
+            cmake/
+            xbmc/addons/AddonBindings.cmake
+            xbmc/addons/kodi-dev-kit/include/kodi/
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
+      - name: Build and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          WS="$(pwd -W)"
+          mkdir -p xbmc/cmake/addons/addons/${app_id}
+          echo "${app_id} ${WS}/${app_id}" > xbmc/cmake/addons/addons/${app_id}/${app_id}.txt
+
+          cmake \
+            -B "${app_id}/build" \
+            -G "Visual Studio 17 2022" -A x64 -T host=x64 \
+            -DADDONS_TO_BUILD="${app_id}" \
+            -DADDON_SRC_PREFIX="${WS}" \
+            -DADDONS_DEFINITION_DIR="${WS}/xbmc/cmake/addons/addons" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${WS}/install" \
+            -DPACKAGE_ZIP=1 \
+            "${WS}/xbmc/cmake/addons"
+          cmake --build "${app_id}/build" --config Release --target "${app_id}"
+
+          VERSION=$(grep '^ *version=' "${app_id}/${app_id}/addon.xml.in" | head -1 | sed 's/.*version="\([^"]*\)".*/\1/')
+          ZIP_NAME="${app_id}-${VERSION}-windows-x86_64.zip"
+          mkdir -p artifacts
+          # This is the diagnostic that was missing. The build reports success but
+          # no zip ever reached a release, so say plainly what the install step
+          # produced instead of letting 7z make an empty archive.
+          if [[ ! -d "install/${app_id}" ]]; then
+            echo "::error::install/${app_id} does not exist after a successful build," \
+                 "so there is nothing to package. This is the known Windows gap:" \
+                 "v0.3.11 shipped 10 assets from 12 green jobs." >&2
+            echo "--- install/ ---"; ls -la install 2>/dev/null || echo "(no install/)"
+            echo "--- zips anywhere ---"; find . -name '*.zip' -not -path './xbmc/*' | head
+            exit 1
+          fi
+          (cd install && 7z a -tzip "${WS}/artifacts/${ZIP_NAME}" "${app_id}/")
+          ls -la artifacts/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.app_id }}-windows-x86_64-pr
+          retention-days: 14
+          path: ${{ github.workspace }}/artifacts/*.zip
+          if-no-files-found: error
+

@@ -43,15 +43,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: linux, arch: x86_64, channel: Omega, kodi: 21 }
           - { os: linux, arch: x86_64, channel: Piers, kodi: 22 }
-          - { os: linux, arch: armv7, channel: Omega, kodi: 21, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
           - { os: linux, arch: armv7, channel: Piers, kodi: 22, cross_pkgs: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf" }
-          - { os: linux, arch: aarch64, channel: Omega, kodi: 21, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
           - { os: linux, arch: aarch64, channel: Piers, kodi: 22, cross_pkgs: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" }
-          - { os: android, arch: armv7, channel: Omega, kodi: 21 }
           - { os: android, arch: armv7, channel: Piers, kodi: 22 }
-          - { os: android, arch: aarch64, channel: Omega, kodi: 21 }
           - { os: android, arch: aarch64, channel: Piers, kodi: 22 }
     steps:
       - name: Checkout addon
@@ -116,7 +111,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.app_id }}-${{ matrix.os }}-${{ matrix.arch }}-kodi${{ matrix.kodi }}
+          name: ${{ env.app_id }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ github.workspace }}/artifacts/*.zip
           # Not the default (warn). This addon is the reason the default matters:
           # v0.3.11 attached 10 assets from 12 green jobs because the Windows jobs
@@ -130,14 +125,14 @@ jobs:
     # than either of the alternatives: without this the whole release fails and no
     # platform ships, and without if-no-files-found: error below it goes green and
     # nobody learns. The job will show as failed; the release still drafts with the
-    # platforms that do build. Flip this off and set the expected count to 12 in
-    # the release job once Windows attaches a zip.
+    # platforms that do build. Once Windows attaches a zip: drop this line, move
+    # windows-x86_64 from known_missing to required in the release job, and add it
+    # to inputstream.tempo's platforms in repository.kontell/addons.toml.
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { channel: Omega, kodi: 21 }
           - { channel: Piers, kodi: 22 }
     steps:
       - name: Checkout addon
@@ -181,7 +176,7 @@ jobs:
           cmake --build "${app_id}/build" --config Release --target "${app_id}"
 
           VERSION=$(grep '^ *version=' "${app_id}/${app_id}/addon.xml.in" | head -1 | sed 's/.*version="\([^"]*\)".*/\1/')
-          ZIP_NAME="${app_id}-${VERSION}-windows-x86_64-kodi${{ matrix.kodi }}.zip"
+          ZIP_NAME="${app_id}-${VERSION}-windows-x86_64.zip"
           mkdir -p artifacts
           # This is the diagnostic that was missing. The build reports success but
           # no zip ever reached a release, so say plainly what the install step
@@ -200,7 +195,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.app_id }}-windows-x86_64-kodi${{ matrix.kodi }}
+          name: ${{ env.app_id }}-windows-x86_64
           path: ${{ github.workspace }}/artifacts/*.zip
           if-no-files-found: error
 
@@ -232,6 +227,55 @@ jobs:
             exit 1
           fi
 
+      - name: Assert the tag belongs to this channel
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This branch builds Piers only, so a v22.* tag is the only kind that
+          # can legitimately be cut here. Without this, a tag pushed on the wrong
+          # branch produces a complete, plausible release of the wrong Kodi version
+          # — and because the channel is derived from the version major, it would be
+          # filed into the wrong directory in the repository too.
+          tag="${GITHUB_REF_NAME#v}"
+          major="${tag%%.*}"
+          echo "tag=$GITHUB_REF_NAME major=$major expected=22 (Piers)"
+          if [[ "$major" != "22" ]]; then
+            echo "::error::$GITHUB_REF_NAME is not a Piers tag (expected v22.y.z)." \
+                 "Cut Piers releases on this branch and the other channel's on its own." >&2
+            exit 1
+          fi
+
+      - name: Assert the changelog and news name this version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The release body and the repository's <news> are both derived from the
+          # tree, and neither was ever checked against the version. That is not
+          # hypothetical: inputstream.tempo's changelog.txt sat at v0.3.5 while
+          # 0.3.6 through 0.3.11 shipped, so every draft body since was wrong and
+          # had to be rewritten by hand at publish time — and v0.3.6's went out
+          # still headed v0.3.5.
+          version="$(grep '^ *version=' ${app_id}/addon.xml.in | head -1 | sed 's/.*version="\([^"]*\)".*/\1/')"
+          top="$(awk -v RS= 'NR==1' ${app_id}/changelog.txt | head -1 | tr -d '\r')"
+          if [[ "$top" != "v$version" ]]; then
+            echo "::error::changelog.txt's top entry is '$top' but this release is v$version." \
+                 "The top paragraph becomes the release body, so it would describe the" \
+                 "wrong version. Add a v$version entry at the top." >&2
+            exit 1
+          fi
+          # <news> in addon.xml.in, where present, is what Kodi shows when browsing
+          # the repository, and generate_repo.py will not fall back to changelog.txt
+          # while it exists — so a stale one is what users actually read.
+          news="$(sed -n 's/.*<news>\(.*\)/\1/p' ${app_id}/addon.xml.in | head -1 || true)"
+          if [[ -n "$news" && "$news" != *"$version"* ]]; then
+            echo "::error::addon.xml.in <news> does not mention $version. It takes priority" \
+                 "over changelog.txt when browsing the repository, so it is what users see." >&2
+            exit 1
+          fi
+          echo "changelog top = v$version${news:+, and <news> names it}"
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -246,31 +290,33 @@ jobs:
           find artifacts -mindepth 1 -type d -empty -delete
           ls -la artifacts/
 
-          # Every platform that must be present, per Kodi version. Windows is
-          # listed separately because it is a known gap being tracked, not because
-          # it is optional: its absence warns loudly rather than passing silently,
-          # and anything else missing fails the release.
+          # Every platform this branch must produce. It builds one Kodi version,
+          # so there is no loop over channels — the previous `for kodi in 21 22`
+          # survived the channel split and would have failed every release looking
+          # for the other channel's zips.
+          #
+          # Windows is listed separately because it is a known gap being tracked,
+          # not because it is optional: its absence warns loudly rather than
+          # passing silently, and anything else missing fails the release.
           required=(linux-x86_64 linux-armv7 linux-aarch64 android-armv7 android-aarch64)
           known_missing=(windows-x86_64)
           status=0
-          for kodi in 21 22; do
-            for plat in "${required[@]}"; do
-              if ! ls artifacts/${app_id}-*-${plat}-kodi${kodi}.zip >/dev/null 2>&1; then
-                echo "::error::missing ${plat} for Kodi ${kodi}" >&2
-                status=1
-              fi
-            done
-            for plat in "${known_missing[@]}"; do
-              if ! ls artifacts/${app_id}-*-${plat}-kodi${kodi}.zip >/dev/null 2>&1; then
-                echo "::warning::${plat} for Kodi ${kodi} is absent — the tracked" \
-                     "Windows gap. This release will not serve Windows users." >&2
-              else
-                echo "::notice::${plat} for Kodi ${kodi} is present — the Windows gap" \
-                     "is fixed. Move it out of known_missing here, drop" \
-                     "continue-on-error from build-windows, and add windows-x86_64 to" \
-                     "inputstream.tempo's platforms in repository.kontell/addons.toml." >&2
-              fi
-            done
+          for plat in "${required[@]}"; do
+            if ! ls artifacts/${app_id}-*-${plat}.zip >/dev/null 2>&1; then
+              echo "::error::missing ${plat}" >&2
+              status=1
+            fi
+          done
+          for plat in "${known_missing[@]}"; do
+            if ! ls artifacts/${app_id}-*-${plat}.zip >/dev/null 2>&1; then
+              echo "::warning::${plat} is absent — the tracked Windows gap. This" \
+                   "release will not serve Windows users." >&2
+            else
+              echo "::notice::${plat} is present — the Windows gap is fixed. Move it" \
+                   "out of known_missing here, drop continue-on-error from" \
+                   "build-windows, and add windows-x86_64 to inputstream.tempo's" \
+                   "platforms in repository.kontell/addons.toml." >&2
+            fi
           done
           echo "zips: $(find artifacts -name '*.zip' | wc -l)"
           exit $status
@@ -299,6 +345,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          # Pin the commit the release is anchored to. Left unset, the action
+          # defaults it to the repository's default branch — so the Omega draft
+          # recorded target_commitish: Piers. That is inert while the git tag
+          # already exists, but if the tag is ever deleted with the draft left
+          # behind, publishing it makes GitHub *create* the tag at that target:
+          # v21.13.0 would come to rest on the Kodi 22 branch. The tag-major
+          # guard cannot catch it, because that runs on tag push, not on publish.
+          target_commitish: ${{ github.sha }}
           name: ${{ env.app_id }} ${{ steps.version.outputs.version }}
           body: ${{ steps.version.outputs.changes }}
           draft: true

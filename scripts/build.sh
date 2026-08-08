@@ -260,7 +260,10 @@ echo "=== Building ==="
 make -C "$BUILD_DIR" -j"$JOBS"
 
 # Package (remove symlinks to avoid bloating the zip with duplicate .so copies)
-ZIP_NAME="${ADDON_ID}-${ADDON_VERSION}-${TARGET_OS}-${TARGET_ARCH}-kodi${KODI_VERSION}.zip"
+# The zip name carries no -kodi<N> suffix: the version's major already states the
+# Kodi version (21.x.y / 22.x.y), and two fields that must agree eventually will
+# not. repository.kontell derives the channel from the version.
+ZIP_NAME="${ADDON_ID}-${ADDON_VERSION}-${TARGET_OS}-${TARGET_ARCH}.zip"
 echo ""
 echo "=== Packaging ==="
 cd "$INSTALL_DIR"

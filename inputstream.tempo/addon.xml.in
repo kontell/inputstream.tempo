@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="0.3.11"
+  version="22.3.11"
   name="Inputstream Tempo"
   provider-name="kontell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with audio tempo control (pitch-corrected playback speed)</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in audio tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts. Based on inputstream.ffmpegdirect.</description>
-    <news>v0.3.11 Fix VideoPlayer hang on audiobook files with embedded cover art. m4b/mp3 sources expose the cover as an attached_pic mjpeg stream; VideoPlayer was spinning up its video pipeline for that stream, failing OpenStream, and wedging in caching state 2 with the audio thread paused. AddStream now discards attached_pic streams so GetStreamIds is audio-only and VideoPlayer never starts the video pipeline.</news>
+    <news>v22.3.11 Renumbered to Kodi's add-on versioning: the first number is now the Kodi version a build is for, so 22.x.y is Kodi 22 (Piers) and 21.x.y is Kodi 21 (Omega). The add-on itself is unchanged from v0.3.11 — only the numbering and the build system moved. Kodi 21 and Kodi 22 now build from separate branches and release separately.</news>
   </extension>
 </addon>
