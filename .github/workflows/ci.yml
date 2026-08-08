@@ -8,7 +8,7 @@ name: CI
 
 on:
   push:
-    branches: [Piers, Omega]
+    branches: [Piers]
   pull_request:
 
 permissions:
@@ -31,8 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cc: gcc, cxx: g++, channel: Omega, kodi: 21 }
-          - { cc: clang, cxx: clang++, channel: Omega, kodi: 21 }
           - { cc: gcc, cxx: g++, channel: Piers, kodi: 22 }
           - { cc: clang, cxx: clang++, channel: Piers, kodi: 22 }
     steps:
@@ -96,7 +94,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { channel: Omega, kodi: 21 }
           - { channel: Piers, kodi: 22 }
     steps:
       - name: Checkout addon
@@ -158,7 +155,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { channel: Omega, kodi: 21 }
           - { channel: Piers, kodi: 22 }
     steps:
       - name: Checkout addon
