@@ -520,13 +520,45 @@ void FFmpegStream::WriteTempoState(const char* event)
            anchored ? m_tempoOutputPts / 1000.0 : -1.0, CurrentDelta() / 1000.0,
            QueueSecsForReadout(), m_hasVideo ? "true" : "false");
 
+  // C stdio for the same reason as CheckTempoFileUpdate: no iostreams in a
+  // library that carries its own libstdc++.
+  FILE* f = fopen(tmp.c_str(), "w");
+  if (!f)
+    return;
+  const bool ok = fputs(buf, f) >= 0;
+  fclose(f);
+  if (ok)
+    std::rename(tmp.c_str(), path.c_str());
+  else
+    std::remove(tmp.c_str());
+}
+
+double FFmpegStream::ParseTempo(const char* text)
+{
+  // "1.03", " 1,03\n", "2" — digits with an optional fraction, either
+  // separator, surrounding whitespace. Locale-independent on purpose: Kodi's
+  // LC_NUMERIC is whatever the user's language set it to.
+  const char* p = text;
+  while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')
+    ++p;
+  double value = 0.0;
+  bool digits = false;
+  for (; *p >= '0' && *p <= '9'; ++p)
   {
-    std::ofstream f(tmp, std::ios::out | std::ios::trunc);
-    if (!f.is_open())
-      return;
-    f << buf;
+    value = value * 10.0 + (*p - '0');
+    digits = true;
   }
-  std::rename(tmp.c_str(), path.c_str());
+  if (*p == '.' || *p == ',')
+  {
+    double scale = 0.1;
+    for (++p; *p >= '0' && *p <= '9'; ++p)
+    {
+      value += (*p - '0') * scale;
+      scale *= 0.1;
+      digits = true;
+    }
+  }
+  return digits ? value : 0.0;
 }
 
 bool FFmpegStream::CheckAndUpdateInitialSeekHold()
@@ -3276,12 +3308,19 @@ void FFmpegStream::CheckTempoFileUpdate()
 
   try
   {
-    std::ifstream f(m_tempoFilePath);
-    if (!f.is_open())
+    // C stdio, not iostreams. The Linux build carries its own static
+    // libstdc++ while Kodi loads the system one; an std::ifstream here bound
+    // across the two copies and crashed on first use inside the flatpak Kodi
+    // (PC landed on libstdc++'s typeinfo). libc exists exactly once.
+    FILE* f = fopen(m_tempoFilePath.c_str(), "r");
+    if (!f)
       return;
+    char buf[64] = {};
+    const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = '\0';
 
-    double newTempo = 0;
-    f >> newTempo;
+    const double newTempo = ParseTempo(buf);
     if (newTempo < 0.5 || newTempo > 100.0)
       return;
     if (std::abs(newTempo - m_currentTempo) < 0.001)
