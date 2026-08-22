@@ -35,6 +35,15 @@ v22.4.0
   characteristics (HDR10 signalling); upstream reports them unspecified.
 - Service window properties now also update while video is playing.
 - New: tests/tempomap_test.cpp, a dependency-free check of the map.
+- Fix a crash on the first tempo-file poll inside the flatpak Kodi (and any
+  Kodi whose libstdc++ differs from the build host's): the Linux build links
+  libstdc++ statically but exported its symbols, so std::ifstream bound across
+  two libstdc++ copies and jumped into typeinfo. The tempo and state files now
+  go through C stdio, and the Linux link hides the static runtime
+  (-Wl,--exclude-libs,ALL). Present since the first Linux release.
+- New: tests/live/tempo_checklist.py, the JSON-RPC driver for the video
+  checklist (rate slope, dead time, readout step, seeks, audio-track switch,
+  renderer rebuilds), local or over adb.
 
 v22.3.11
 - Renumbered to Kodi's add-on versioning: the first number is now the Kodi version a build is for, so 22.x.y is Kodi 22 (Piers) and 21.x.y is Kodi 21 (Omega). The add-on itself is unchanged from v0.3.11 — only the numbering and the build system moved

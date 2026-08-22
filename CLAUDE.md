@@ -144,6 +144,13 @@ g++ -std=c++17 -I src/stream tests/tempomap_test.cpp -o /tmp/tempomap_test && /t
 ./scripts/build.sh --os android --arch armv7  --kodi 22 --kodi-src <kodi> --ndk <ndk>
 ```
 
+**The Linux zips carry a static libstdc++, so no iostreams in the add-on.**
+CI links with `-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL`; without
+the `--exclude-libs` the `.so` exported 2,499 `std::` symbols and an
+`std::ifstream` bound across the add-on's copy and Kodi's, crashing the flatpak
+Kodi on the first tempo-file poll. Read and write files with C stdio
+(`CheckTempoFileUpdate`, `WriteTempoState`); `std::string`/containers are fine.
+
 Cross-compilation goes through Kodi's own depends system; the four Android traps
 and the dependency-ordering race are in `kodi-android-ndk`. This add-on's
 autotools chain is ffmpeg, gnutls, nettle, gmp, iconv and libzvbi.
