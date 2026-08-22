@@ -53,5 +53,12 @@ namespace ffmpegdirect
     double m_audioTempo = 1.0;
     std::string m_tempoFilePath;
     double m_startTimeSecs = 0.0;
+    // Depth of Kodi's demux queues in seconds. Omega hard-codes 8 s; Piers
+    // exposes videoplayer.queuetimesize (default 4 s). The caller passes the
+    // value in force so time is reported at the playing point, not the demux head.
+    double m_queueSecs = 8.0;
+    // Add-on-side bound on how far output may run ahead of real time when a
+    // video stream is present. 0 (default) leaves pacing to Kodi's queues.
+    double m_leadSecs = 0.0;
   };
 } //namespace ffmpegdirect

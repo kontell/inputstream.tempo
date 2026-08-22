@@ -1,101 +1,176 @@
 # inputstream.tempo
 
-Fork of inputstream.ffmpegdirect with built-in audio tempo (pitch-corrected playback speed) via FFmpeg's atempo filter. Binary Kodi addon (`kodi.inputstream`).
+Fork of `inputstream.ffmpegdirect` adding pitch-corrected playback speed via
+FFmpeg's `atempo` filter. Binary Kodi add-on (`kodi.inputstream`), plus a Python
+service for window properties, keymap install and notifications.
 
-## Architecture
+## Kodi knowledge lives in kodi-drive
 
-- `src/stream/FFmpegStream.cpp/.h` — main demuxer, tempo pipeline, seek, time reporting
-- `src/StreamManager.cpp/.h` — addon entry point, property parsing, stream lifecycle
-- `src/utils/Properties.h` — parsed ListItem properties
-- `inputstream.tempo/resources/lib/runner.py` — Python background service (window properties, keymap install, debounced notifications)
-- `inputstream.tempo/resources/lib/speed.py` — RunScript handler for keyboard/dialog speed control
+Shared Kodi knowledge is **not** in this file. Use the `kodi-drive:*` skills, or
+read `../kodi-drive/README.md`.
 
-## Tempo processing pipeline
+Directly relevant: `kodi-inputstream` (the two clocks, capability flags, filter
+state across a flush, FFmpeg version differences, stream-analysis tuning),
+`kodi-binary-build`, `kodi-android-ndk`, `kodi-versions-abi`, `kodi-addon-release`,
+`kodi-paplayer`, `kodi-playback-resume`.
 
-In `FFmpegStream::AddStream()`, when tempo is enabled, `InitTempoProcessing()` builds an FFmpeg filter graph: `abuffer → atempo → aformat(f32) → abuffersink`. Audio packets are decoded, filtered, and re-packaged as PCM float32 in `ProcessAudioPacketWithTempo()`. Output goes into `m_tempoOutputQueue`; `DemuxRead()` pops from it.
+**Do not add generally-useful Kodi findings here** — contribute them to kodi-drive.
+This file holds only what is specific to *this* add-on.
 
-The tempo file (`special://temp/inputstream_tempo`) is polled every ~50 packets via `CheckTempoFileUpdate()`. Live tempo changes use `avfilter_graph_send_command()` when possible, falling back to a full graph rebuild.
+## Layout
 
-FFmpeg 6's matroska/webm demuxer leaves the codec context's `sample_rate` / `ch_layout` / `sample_fmt` unpopulated for Opus until the first packet decodes — the values live in `codecpar` but not in the context. `InitTempoProcessing` defensively backfills from `codecpar` after `avcodec_open2`, otherwise `BuildFilterGraph` would build `time_base=1/0` and `abuffer` creation would fail. FFmpeg 7 fills them up front; this only matters on Kodi builds bundling FFmpeg 6 (e.g. our patched build with `ENABLE_INTERNAL_FFMPEG=ON`).
-
-If `BuildFilterGraph` fails despite the backfill, `InitTempoProcessing` clears `m_tempoEnabled` and `m_tempoAudioStreamIndex` so the demux dispatcher routes packets through the passthrough branch instead of dereferencing the freed decoder context.
-
-## Key properties (set on ListItem by calling addon)
-
-| Property | Purpose |
+| Path | |
 |---|---|
-| `inputstream.tempo.tempo` | Initial playback speed (e.g. "1.5") |
-| `inputstream.tempo.tempo_file` | Path to runtime tempo file (atomic write triggers live tempo change) |
-| `inputstream.tempo.start_time` | Resume position in seconds — pre-sets `m_currentPts` for `GetTime()` display **and** arms the initial seek hold (see below) |
+| `src/stream/FFmpegStream.cpp/.h` | demuxer, tempo pipeline, seek, time reporting |
+| `src/stream/TempoMap.h` | the content↔output time map every stream is projected through (header-only; `tests/tempomap_test.cpp`) |
+| `src/StreamManager.cpp/.h` | entry point, property parsing, stream lifecycle |
+| `src/utils/Properties.h` | parsed ListItem properties |
+| `resources/lib/runner.py` | background service — window properties, keymap, notifications |
+| `resources/lib/speed.py` | `RunScript` handler for keyboard/dialog speed control |
 
-Resume seeking is NOT done by the inputstream. The calling addon sets PAPlayer's `audiobook_bookmark` property instead, which PAPlayer handles natively.
+## Property contract
+
+Set on the ListItem by the calling add-on:
+
+| Property | |
+|---|---|
+| `inputstream.tempo.tempo` | initial speed, e.g. `1.5` |
+| `inputstream.tempo.tempo_file` | path polled for live tempo changes (atomic write) |
+| `inputstream.tempo.start_time` | resume position in seconds — pre-sets `m_currentPts` for `GetTime()` **and** arms the initial seek hold (audio-only items; never for video) |
+| `inputstream.tempo.queue_secs` | depth of Kodi's demux queues in seconds: 8 on Omega (hard-coded), Kodi 22's `videoplayer.queuetimesize` on Piers (default 4). Time is reported this far behind the demux head. Default 8 |
+| `inputstream.tempo.lead_secs` | optional add-on-side lead bound for video items; 0 (default) leaves pacing to Kodi's queues |
+
+The add-on writes back to **`<tempo_file>.state`** — one JSON line, replaced
+atomically, on every applied tempo change, anchor and audio re-target:
+`{"seq","event","tempo","content_ms","output_ms","delta_ms","queue_secs","video"}`.
+A caller confirms a change landed by watching `seq`/`event`.
+
+**Resume seeking is not done here.** The calling add-on sets PAPlayer's
+`audiobook_bookmark`, which PAPlayer applies natively before audio output begins.
+See `kodi-playback-resume`.
+
+## Tempo pipeline
+
+`FFmpegStream::AddStream()` → `InitTempoProcessing()` builds
+`abuffer → atempo → aformat(f32) → abuffersink`. Audio packets are decoded,
+filtered, and re-packaged as PCM float32 in `ProcessAudioPacketWithTempo()`; output
+goes to `m_tempoOutputQueue`, and `DemuxRead()` pops from it.
+
+**Every audio stream is advertised as PCM f32** (source codec/bitrate kept for
+the OSD), because any of them may be the one Kodi selects. The pipeline is
+brought up on the first audio stream met and **re-targeted in `OpenStream(id)`**
+(`RetargetTempoAudio`) to whichever track Kodi opens — Kodi re-reads the stream
+properties after `OpenStream` returns true, which is what makes this work. The
+other audio tracks get `AVDISCARD_ALL` and their packets never reach Kodi. If the
+new track cannot be decoded, tempo switches off and all audio streams are
+re-advertised with their real codecs.
+
+The tempo file is polled by wall clock every 250 ms (`kTempoPollInterval`) via
+`CheckTempoFileUpdate()`. Live changes use `avfilter_graph_send_command()` where
+possible, falling back to a full graph rebuild. Each change starts a new map
+segment (below) at the audio's next output packet.
+
+If `BuildFilterGraph` fails, `InitTempoProcessing` clears `m_tempoEnabled` and
+`m_tempoAudioStreamIndex` so the dispatcher routes packets through the passthrough
+branch rather than dereferencing a freed decoder context.
+
+**Rebuild policy:** `SeekTime` rebuilds the graph only when
+`m_tempoEmittedPackets < 10`. Startup-window seeks reset the filter cleanly;
+mid-stream seeks keep the warm filter. The v0.3.7 unconditional rebuild caused an
+audible pause at every skip. The general rule is in `kodi-inputstream`.
 
 ## Initial seek hold
 
-When `start_time > 0` is set, an internal hold is armed in `Open()`. While active, packets emitted to `m_tempoOutputQueue` carry zero-filled PCM (silence) instead of real samples — Kodi's format detection, `CAudioDecoder::Init`, and `SeekTime`'s wait-for-pts loop all see normal-shaped packets so they complete, but the audio sink plays silence until PAPlayer's bookmark seek lands. Without this, ~50 ms of pts=0 audio leaks to the sink between `OpenSink` and the bookmark seek (audible at resume start).
+With `start_time > 0`, a hold is armed in `Open()`. While active, packets carry
+zero-filled PCM, so Kodi's format detection, `CAudioDecoder::Init` and `SeekTime`'s
+wait-for-pts loop all complete while the sink plays silence until PAPlayer's
+bookmark seek lands. Without it, ~50 ms of pts=0 audio leaks to the sink.
 
-The hold clears on any `SeekTime(time)` where `time > 100 ms` (i.e. PAPlayer's init `SeekTime(0)` doesn't clear it; the bookmark seek does). Safety timeout: 2 s — if no seek arrives, the hold releases and packets emit real audio.
+Clears on any `SeekTime(time)` where `time > 100 ms` — so PAPlayer's init
+`SeekTime(0)` does not clear it, and the bookmark seek does. Safety timeout 2 s.
 
-## Dual PTS: output rate vs content rate
+**Not armed for video items** (`m_hasVideo`): VideoPlayer seeks the demuxer
+before any output starts, so the hold would only delay the first picture.
 
-ActiveAE schedules audio against packet `pts/dts`, so they must advance at the **output** rate (the rate samples are consumed by the sink). The OSD wants **content** rate (the actual position in the source file, advancing at tempo-adjusted speed). At non-1× tempo the two diverge.
+## Two domains, one map
 
-`ProcessAudioPacketWithTempo` writes both:
-- `outPkt->pts = outPkt->dts = m_tempoOutputPts` (advances by `nb_samples / sample_rate` per packet — output rate)
-- `outPkt->dispTime = m_tempoContentPts / STREAM_TIME_BASE * 1000` ms (advances by `outputDuration × tempo` — content rate)
+Packet `pts`/`dts` advance at **output** rate for ActiveAE; the OSD wants
+**content** time. `src/stream/TempoMap.h` holds the piecewise-linear map between
+them (slope `1/rate` per segment, a new segment per tempo change) and **every
+stream goes through it**:
 
-After a seek, `m_tempoSeekPending` is set; the first raw audio packet's DTS anchors both `m_tempoOutputPts` and `m_tempoContentPts` to the actual seek landing (important for MP3 VBR where seeks can be imprecise).
+- audio: `m_tempoContentPts`/`m_tempoOutputPts` walk the map (content advances
+  `out × rate` per output packet); they anchor on the **first decoded frame's
+  timestamp** (`best_effort_timestamp`, with `pkt_timebase` set so codec priming
+  is already stripped), not the packet dts;
+- video and subtitles: `ProjectPacket()` maps `pts`, `dts` and `duration` in
+  `DemuxRead`'s non-tempo branch. Data untouched.
 
-`m_currentPts` is updated from `dispTime` when packets pop out of `m_tempoOutputQueue`, so `GetTime()` (used by PAPlayer) tracks content position.
+**Continuity rule.** Δ = content − output changes only while rate ≠ 1 — never at
+a seek or a flush. `ResetTempoMapForSeek()` carries the last Δ Kodi saw
+(`m_deltaReported`, else Δ at the head) into the next anchor. That is what makes
+Kodi's own accurate-seek arithmetic (`startpts = target − time_offset`) land, and
+`SeekTime` returns `*startpts` through the map for the same reason.
 
-## VideoPlayer OSD: dynamic ptsStart
+**Time is reported at the playing point.** `GetTimes()` returns
+`ptsStart = −Δ(head − queue_secs)`, not Δ at the head: the head runs a queue
+depth ahead of what is playing, and Δ at the head is wrong by `(rate − 1) ×
+queue` while a tempo change runs. Audio-only items use 0 (legacy behaviour;
+PAPlayer never calls `GetTimes`).
 
-VideoPlayer computes `state.time = m_clock.GetClock() − ptsStart`, and `m_clock` is locked to packet pts (output rate). To make the OSD track content time, `GetTimes()` returns a dynamic `ptsStart` updated at packet **pop** (not emit):
+**Capability flags.** `IPOSTIME` is advertised only for video items with tempo
+on: VideoPlayer then passes seek targets in content time and calls
+`PosTime()` + `DemuxFlush()`; `PosTime` seeks **backward** itself because Kodi
+drops its flag on that path. Audio-only items keep the legacy flag set so
+PAPlayer's seek/flush sequence is untouched. Why each flag matters:
+`kodi-inputstream`.
 
+**Pacing.** The 2 s wall-clock throttle (sleeping inside `DemuxRead`) applies to
+audio-only items only. For video, `DemuxRead` runs on VideoPlayer's own loop, so
+Kodi's queues pace delivery; `lead_secs > 0` re-enables a bound as empty packets
+with a 10 ms nap. Keep it that way — a long sleep there delays every pause and
+seek.
+
+Test the map without Kodi or FFmpeg:
+
+```bash
+g++ -std=c++17 -I src/stream tests/tempomap_test.cpp -o /tmp/tempomap_test && /tmp/tempomap_test
 ```
-ptsStart = popped_packet.pts (output µs) − STREAM_MSEC_TO_TIME(dispTime) (content µs)
-```
-
-Substituting back: `state.time ≈ m_clock − (output − content) ≈ content`. Reading at pop bounds the value by Kodi's actual consumption rate — the v0.3.4 emit-time variant drifted ahead and made `state.time` explode.
-
-`UpdatePtsStartFromPop()` is wired at both `DemuxRead` pop sites. `SeekTime` and `DemuxFlush` invalidate the cached value via `m_ptsStartDynamicValid = false` so the old delta doesn't survive a position change. At tempo `1.0` the delta is 0 and behaviour matches a static `ptsStart=0`.
-
-## Filter graph rebuild policy
-
-atempo carries internal sample history across `avcodec_flush_buffers`, so post-seek frames blend residual pre-seek samples with new input — audible click at stream start (PAPlayer's init `SeekTime(0)` immediately follows the first emit) and at user seeks. `SeekTime` rebuilds the filter graph **only when `m_tempoEmittedPackets < 10`** — startup-window seeks reset the filter cleanly; mid-stream user seeks keep the warm filter and skip the rebuild gap (the v0.3.7 unconditional rebuild caused an audible pause at every skip).
-
-## Stream analysis optimization
-
-For tempo-enabled streams, `analyzeduration=500000` (0.5s) and `probesize=131072` (128KB) are set before `avformat_find_stream_info()`. Audiobook/podcast containers have codec params in headers; the default 5s/5MB analysis was the main startup bottleneck.
-
-## Cross-compile notes
-
-The `scripts/build.sh` handles cross-compilation for Linux ARM and Android:
-- `CPU` must be set as a CACHE var in the toolchain file (Kodi's HandleDepends doesn't forward it)
-- Android needs per-target NDK clang wrappers (ffmpeg's configure doesn't read CMAKE_C_COMPILER_TARGET)
-- Autoconf deps (gnutls, nettle, gmp, iconv, libzvbi) need `--host` and `CC`/`CXX` from env
-- `PKG_CONFIG_LIBDIR` is pinned to the cross-built deps dir to avoid host-system lib pollution
-- gnutls built with `--without-zstd --without-brotli` (host detection breaks cross-compile)
-- libzvbi depends on iconv (explicit dep in deps.txt to prevent race condition)
 
 ## Build
 
 ```bash
-./scripts/build.sh --os linux --arch x86_64 --kodi 21 --kodi-src ~/xbmc
-./scripts/build.sh --os android --arch armv7 --kodi 22 --kodi-src ~/xbmc --ndk ~/android-ndk-r25c
+./scripts/build.sh --os linux   --arch x86_64 --kodi 21 --kodi-src <kodi>
+./scripts/build.sh --os android --arch armv7  --kodi 22 --kodi-src <kodi> --ndk <ndk>
 ```
 
-## CI and releases
+Cross-compilation goes through Kodi's own depends system; the four Android traps
+and the dependency-ordering race are in `kodi-android-ndk`. This add-on's
+autotools chain is ffmpeg, gnutls, nettle, gmp, iconv and libzvbi.
 
-This branch is **Piers** and builds **Kodi 22 only**; the other channel is the `Omega` branch at `21.y.z`. Versions here are `22.y.z` and tags are `v22.y.z` — the major carries the Kodi version, which is what `repository.kontell` uses to file a build under `omega/` or `piers/`.
+## Channels and releases
 
-- `ci.yml` — every PR and push: gcc/clang/msvc compile checks plus a `package` job uploading an installable PR zip.
-- `release.yml` — on a `v22.*` tag: 6-platform matrix, then a draft release. Asserts the tag matches `addon.xml.in` and that its major is 22.
-- `drift.yml` — weekly: asserts upstream's declared ABI floor is still one our pinned build satisfies.
-- `notify-repo.yml` — announces a published release to `repository.kontell`. Publish the draft yourself; one published by a workflow using the default `GITHUB_TOKEN` raises no event.
+This branch is **Piers** (Kodi 22, versions `22.y.z`, tags `v22.*`); the other is
+**Omega** (Kodi 21, `21.y.z`). The major carries the Kodi version — see
+`kodi-versions-abi`.
 
-Kodi is pinned at `22.0b1-Piers` rather than tracking a branch: `@ADDON_DEPENDS@` is filled from those headers, so an unpinned ref moves the declared `kodi.binary.instance.inputstream` version with no commit here. **The inputstream ABI has no cushion on either channel** (MIN equals current, 3.3.0 on Omega and 3.4.0 on Piers), so any upstream bump immediately splits the pinned build from current Kodi — `drift.yml` watches for it.
+Workflows: `ci.yml` (gcc/clang/msvc + a PR zip), `release.yml` (6-platform matrix,
+draft), `drift.yml` (weekly ABI-floor check), `notify-repo.yml`.
 
-**Windows builds are broken and the failure is deliberately visible.** They compile successfully and upload nothing, because `actions/upload-artifact` defaults to `if-no-files-found: warn`: v0.3.11 attached 10 assets from 12 green jobs, and `piers/inputstream.tempo+windows-x86_64` has never existed in the served repository. The job is `continue-on-error` so releases still ship the platforms that work; the release step warns by name, and lists the three places to change once it is fixed.
+Publish drafts yourself — `kodi-addon-release` explains why a workflow cannot.
 
-Unlike `pvr.kofin`, the Linux builds are **not** in a pinned container yet — this addon builds FFmpeg plus gnutls, nettle, gmp, iconv and libzvbi through autotools, which is far more dependency surface to move into a bare image. The runner label is pinned meanwhile.
+**Two things specific to this add-on:**
+
+- **The inputstream ABI has no cushion on either channel** (MIN equals current,
+  3.3.0 on Omega and 3.4.0 on Piers), so any upstream bump immediately splits the
+  pinned build from current Kodi. `drift.yml` is what makes that arrive as a cron
+  failure rather than a user report.
+- **Windows builds are broken, and the failure is deliberately visible.** They
+  compile and upload nothing. The job is `continue-on-error` so releases still ship
+  the working platforms; the release step warns by name and lists the three places
+  to change once it is fixed. See `kodi-addon-release` for the
+  `if-no-files-found` default that made this silent in the first place.
+
+Linux builds are **not** in a pinned container yet — this add-on builds far more
+dependency surface than `pvr.kofin`, so the runner label is pinned meanwhile. The
+reasoning for preferring a container is in `kodi-binary-build`.

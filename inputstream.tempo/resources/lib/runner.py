@@ -103,10 +103,13 @@ def run():
             except OSError:
                 pass
 
-        # Active only when audio is playing AND the calling addon has
+        # Active only when something is playing AND the calling addon has
         # signalled that tempo is the active inputstream (via the sentinel
         # file). Skins can gate their UI on InputstreamTempo.Active safely.
-        active = player.isPlayingAudio() and os.path.exists(ACTIVE_FILE)
+        # Video counts too now that the add-on rate-shifts video items.
+        active = (player.isPlayingAudio() or player.isPlayingVideo()) and os.path.exists(
+            ACTIVE_FILE
+        )
         if active:
             tempo = read_tempo()
             win.setProperty('InputstreamTempo.Speed', str(tempo))

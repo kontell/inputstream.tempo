@@ -12,8 +12,12 @@
 #include "BaseStream.h"
 #include "DemuxStream.h"
 #include "CurlInput.h"
+#include "TempoMap.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -213,8 +217,16 @@ private:
   double m_currentTempo = 1.0;
   std::string m_tempoFilePath;
   double m_initialSeekTimeSecs = 0.0;
-  bool m_tempoSeekPending = false;
   int m_tempoAudioStreamIndex = -1;
+
+  // Kodi's demux queue depth and the optional add-on-side lead bound, from
+  // the queue_secs / lead_secs properties (Properties.h explains both).
+  double m_queueSecs = 8.0;
+  double m_leadSecs = 0.0;
+  // A real video stream exists, so VideoPlayer semantics apply: IPOSTIME is
+  // advertised, time is reported at the playing point, and the wall-clock
+  // throttle must not block the player loop.
+  bool m_hasVideo = false;
 
   AVCodecContext* m_audioDecoderCtx = nullptr;
   AVFilterGraph* m_filterGraph = nullptr;
@@ -231,7 +243,6 @@ private:
   // progress and GetTime() reflect content position. Advances by contentDuration
   // per packet (= outputDuration × tempo).
   double m_tempoContentPts = 0.0;
-  int m_tempoCheckCounter = 0;
   int m_tempoEmittedPackets = 0;
   // Wall-clock throttling state. Without this the tempo pipeline races
   // through the source file as fast as ffmpeg can decode, producing
@@ -253,19 +264,33 @@ private:
   static constexpr std::chrono::milliseconds kInitialSeekHoldTimeout{2000};
   bool CheckAndUpdateInitialSeekHold();
 
-  // Dynamic ptsStart for the ITimes/GetTimes branch. At non-1× tempo, the
-  // packet pts/dts are in OUTPUT time (for ActiveAE sync), which means
-  // VideoPlayer's m_clock.GetClock() advances at output rate. To make the
-  // OSD track CONTENT time, GetTimes needs to report a ptsStart that lags
-  // wallclock at the (1 − 1/tempo) rate. We compute it at packet pop:
-  // ptsStart = output_pts_of_just_popped - content_pts_of_just_popped.
-  // Then state.time = clock − ptsStart ≈ content_pts, which is what the
-  // user wants on the OSD. Reading at POP time (not emit time) keeps us
-  // bounded by Kodi's consumption — v0.3.4's emit-counter version drifted
-  // ahead of reality and state.time blew up.
-  double m_ptsStartDynamic = 0.0;
-  bool m_ptsStartDynamicValid = false;
-  void UpdatePtsStartFromPop(const DEMUX_PACKET* pkt);
+  // One content↔output map for every stream (TempoMap.h). The audio path
+  // walks it with the two counters above; video and subtitle packets are
+  // projected through it in ProjectPacket(); GetTimes() reads Δ off it.
+  TempoMap m_tempoMap;
+  // The audio counters must be (re)initialised from the map at the next
+  // decoded frame: set at open, after every seek/flush, and on re-target.
+  bool m_tempoAnchorPending = true;
+  // Highest output-domain dts handed to Kodi since the last anchor — the
+  // demux head. Time is reported QueueSecsForReadout() behind it, because
+  // that is where the packet Kodi is actually playing sits.
+  double m_headOutputPts = STREAM_NOPTS_VALUE;
+  // Δ = content − output as last reported through GetTimes(): the value a
+  // seek must continue from so Kodi's own startpts arithmetic stays right.
+  double m_deltaReported = 0.0;
+  bool m_deltaReportedValid = false;
+  std::chrono::steady_clock::time_point m_lastTempoPoll{};
+  static constexpr std::chrono::milliseconds kTempoPollInterval{250};
+  uint64_t m_tempoStateSeq = 0;
+
+  bool HasVideoStream() const;
+  double QueueSecsForReadout() const;
+  double CurrentDelta() const;
+  void ResetTempoMapForSeek();
+  void NoteOutputHead(double outputDts);
+  void ProjectPacket(DEMUX_PACKET* pkt, int streamIdx);
+  bool RetargetTempoAudio(int streamIdx);
+  void WriteTempoState(const char* event);
 
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();
