@@ -1,3 +1,41 @@
+v21.4.0
+- Tempo now covers video. Video and subtitle packets are projected through the
+  same content↔output time map (src/stream/TempoMap.h) that the stretched
+  audio walks, so a video item stays in A/V sync at any rate. The data is
+  untouched; only timestamps move.
+- The map's offset (content − output) is continuous across seeks and flushes,
+  so Kodi's own accurate-seek arithmetic (startpts = target − time_offset)
+  and the OSD stay right; SeekTime returns startpts in the packets' domain.
+- INPUTSTREAM_SUPPORTS_IPOSTIME is advertised for video items, so VideoPlayer
+  hands seek targets over in content time instead of shifting them by
+  time_offset. PosTime seeks backward to the keyframe (Kodi drops its
+  backward flag on that path) and now passes milliseconds, not seconds.
+- Time is reported at the playing point: GetTimes() reads the map
+  queue_secs behind the demux head (new property inputstream.tempo.queue_secs;
+  8 on Omega, pass Kodi 22's videoplayer.queuetimesize on Piers), so a
+  running tempo change no longer biases the reported position by
+  (rate − 1) × queue depth. Audio-only items keep the old head reading.
+- The audio pipeline follows Kodi's audio-track selection: every audio
+  stream is advertised as PCM f32 and OpenStream re-targets the decoder and
+  atempo graph to the track Kodi opens; the other tracks are discarded at the
+  demuxer.
+- The audio counters anchor on the first decoded frame's own timestamp
+  rather than the packet dts, so codec priming (AAC, MP3) no longer makes the
+  PCM lead the picture by ~40 ms.
+- The tempo file is polled by wall clock (250 ms) instead of every 50 reads,
+  and each applied change, anchor and re-target is written back atomically to
+  <tempo_file>.state as a one-line JSON record.
+- The wall-clock throttle no longer sleeps inside DemuxRead for video items
+  (that is VideoPlayer's own loop); Kodi's queues pace video. The optional
+  inputstream.tempo.lead_secs property re-enables a lead bound for video,
+  implemented as empty packets with a 10 ms nap.
+- The initial seek hold (start_time) is not armed for video items —
+  VideoPlayer seeks before output starts, so it would only delay the picture.
+- Video stream info now carries colour space, range, primaries and transfer
+  characteristics (HDR10 signalling); upstream reports them unspecified.
+- Service window properties now also update while video is playing.
+- New: tests/tempomap_test.cpp, a dependency-free check of the map.
+
 v21.3.11
 - Renumbered to Kodi's add-on versioning: the first number is now the Kodi version a build is for, so 22.x.y is Kodi 22 (Piers) and 21.x.y is Kodi 21 (Omega). The add-on itself is unchanged from v0.3.11 — only the numbering and the build system moved
 - Kodi 21 and Kodi 22 now build from separate branches and are released separately, so a fix can ship to one without waiting for the other
