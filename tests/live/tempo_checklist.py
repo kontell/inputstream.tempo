@@ -216,7 +216,26 @@ def wait_for_playback(kodi, timeout=45.0):
     return False
 
 
+def ensure_addon_enabled(kodi, addonid="inputstream.tempo"):
+    """Kodi registers a freshly dropped-in (or swapped) add-on disabled, and a
+    disabled inputstream makes the #KODIPROP a no-op: the item then plays
+    through the internal demuxer and every number below measures the wrong
+    thing while looking plausible."""
+    details = kodi.call("Addons.GetAddonDetails", {"addonid": addonid, "properties": ["enabled", "version"]})
+    addon = details.get("addon", {})
+    if not addon.get("enabled"):
+        print("[start] %s %s was disabled — enabling" % (addonid, addon.get("version")))
+        kodi.call("Addons.SetAddonEnabled", {"addonid": addonid, "enabled": True})
+        time.sleep(2.0)
+        details = kodi.call("Addons.GetAddonDetails", {"addonid": addonid, "properties": ["enabled"]})
+        if not details.get("addon", {}).get("enabled"):
+            raise SystemExit("%s could not be enabled" % addonid)
+    else:
+        print("[start] %s %s enabled" % (addonid, addon.get("version")))
+
+
 def start(kodi, strm):
+    ensure_addon_enabled(kodi)
     kodi.call("Player.Stop", {"playerid": kodi.playerid}) if kodi.active_player() else None
     time.sleep(1.0)
     kodi.call("Player.Open", {"item": {"file": strm}})
@@ -225,16 +244,40 @@ def start(kodi, strm):
     kodi.active_player()
 
 
-def change_point(series, t_write, base_fit, window=40.0):
-    """First sample after the write whose position runs ahead of the baseline
-    fit by more than 3*rms + 15 ms — i.e. where the new rate became visible."""
-    thresh = 3 * base_fit["rms"] + 15.0
-    for host, pos, _ in series:
-        if host < t_write:
+def breakpoint_fit(series, t_write, min_side=4.0):
+    """Two independent straight lines with one breakpoint after t_write,
+    chosen to minimise the total squared residual. Returns the breakpoint and
+    both fits, or None. Far less sensitive to position jitter than a threshold
+    on the first deviating sample, which lags a 3 % rate change by seconds
+    when readings jitter by ±60 ms."""
+    best = None
+    cands = [s[0] for s in series if s[0] >= t_write + min_side]
+    for tb in cands:
+        pre = [s for s in series if s[0] < tb]
+        post = [s for s in series if s[0] >= tb]
+        if len(pre) < 10 or len(post) < 10:
             continue
-        if pos - predict(base_fit, host) > thresh:
-            return host
-    return None
+        if post[-1][0] - tb < min_side:
+            break
+        f1, f2 = fit(pre), fit(post)
+        if not f1 or not f2:
+            continue
+        sse = f1["rms"] ** 2 * len(pre) + f2["rms"] ** 2 * len(post)
+        if best is None or sse < best[0]:
+            best = (sse, tb, f1, f2)
+    if best is None:
+        return None
+    _, tb, f1, f2 = best
+    return {"t_break": tb, "pre": f1, "post": f2,
+            "step_ms": predict(f2, tb) - predict(f1, tb)}
+
+
+def dump(args, name, payload):
+    if not args.dump:
+        return
+    os.makedirs(args.dump, exist_ok=True)
+    with open(os.path.join(args.dump, name + ".json"), "w") as f:
+        json.dump(payload, f)
 
 
 #################################################################################################
@@ -250,42 +293,38 @@ def scenario_slope(kodi, side, args):
     t_write = side.write_tempo(args.tempo)
     print("[slope] wrote tempo %.2f; sampling %.0fs" % (args.tempo, args.window + args.lead))
     fast_all = sample(kodi, args.window + args.lead)
-    t_change = change_point(fast_all, t_write, bf)
     t_restore = side.write_tempo(1.0)
     print("[slope] restored 1.0; sampling %.0fs" % (args.window + args.lead))
     rest_all = sample(kodi, args.window + args.lead)
     state = side.read_state()
+    dump(args, "slope", {"t_write": t_write, "t_restore": t_restore, "tempo": args.tempo,
+                         "base": base, "fast": fast_all, "rest": rest_all, "state": state})
 
-    report = {"base": bf, "state": state}
-    if t_change is not None:
-        fast = [s for s in fast_all if s[0] >= t_change + 1.0]
-        ff = fit(fast)
-        report["dead_time_s"] = round(t_change - t_write, 2)
-        report["fast"] = ff
-        if ff:
-            # Position step at the change point: the fast fit extrapolated back
-            # to t_change versus the baseline extrapolated forward. Zero means
-            # the reported position was continuous, i.e. no readout bias.
-            report["step_at_change_ms"] = round(predict(ff, t_change) - predict(bf, t_change), 1)
-            report["delta_ppm"] = round(ff["ppm"] - bf["ppm"], 1)
-    rf = fit([s for s in rest_all if s[0] >= t_restore + args.lead + 2.0])
-    report["restored"] = rf
-    if report.get("fast") and rf:
-        ff = report["fast"]
-        # Expected content gained by the pulse: (rate-1) x pulse length at the new rate
-        t_rest_change = change_point(rest_all, t_restore, ff) if False else None
-        report["restore_ppm"] = round(rf["ppm"], 1)
-    print_report("slope", {
+    # Onset: breakpoint fit over baseline tail + tempo window. The pre-line is
+    # the baseline rate, the post-line the tempo rate; the step between them at
+    # the breakpoint is the readout bias (zero = position stayed continuous).
+    on = breakpoint_fit(base[-150:] + fast_all, t_write)
+    off = breakpoint_fit(fast_all[-150:] + rest_all, t_restore)
+    out = {
         "free_run_ppm": fmt_ppm(bf),
-        "tempo_ppm": fmt_ppm(report.get("fast")),
-        "delta_ppm": report.get("delta_ppm"),
         "want_delta_ppm": round((args.tempo - 1.0) * 1e6),
-        "dead_time_s": report.get("dead_time_s"),
-        "step_at_change_ms": report.get("step_at_change_ms"),
-        "restored_ppm": fmt_ppm(rf),
         "state_file": state,
         "samples": (len(base), len(fast_all), len(rest_all)),
-    })
+    }
+    if on:
+        out.update({
+            "tempo_ppm": fmt_ppm(on["post"]),
+            "delta_ppm": round(on["post"]["ppm"] - on["pre"]["ppm"], 1),
+            "dead_time_on_s": round(on["t_break"] - t_write, 2),
+            "step_on_ms": round(on["step_ms"], 1),
+        })
+    if off:
+        out.update({
+            "restored_ppm": fmt_ppm(off["post"]),
+            "dead_time_off_s": round(off["t_break"] - t_restore, 2),
+            "step_off_ms": round(off["step_ms"], 1),
+        })
+    print_report("slope", out)
 
 
 def fmt_ppm(f):
@@ -305,15 +344,30 @@ def scenario_seek(kodi, side, args):
         kodi.call("Player.Seek", {"playerid": kodi.playerid,
                                   "value": {"time": {"hours": h, "minutes": m, "seconds": s, "milliseconds": ms}}})
         t_seek = time.monotonic()
-        time.sleep(2.5)
-        host, pos, _ = kodi.position()
-        # back out the playback since the seek: landed = pos - (elapsed x rate)
-        elapsed_ms = (host - t_seek) * 1000.0 * args.seek_tempo
-        results.append({"target_s": target_s, "reported_s": round(pos / 1000.0, 3),
-                        "landed_est_s": round((pos - elapsed_ms) / 1000.0, 3),
-                        "error_est_ms": round(pos - elapsed_ms - target_s * 1000.0)})
-        print("[seek] target %.3f → reported %.3f, landed ≈ %.3f (%+d ms)" % (
-            target_s, pos / 1000.0, (pos - elapsed_ms) / 1000.0, results[-1]["error_est_ms"]))
+        # Sample through the seek: the position sits still while Kodi flushes
+        # and decodes up to the target, then moves. The landed position is the
+        # post-restart line evaluated at the instant motion resumed — the
+        # seek's own latency must not be mistaken for a landing error.
+        series = sample(kodi, 4.0, hz=20.0)
+        moving = [s for s in series if s[0] > t_seek + 0.3]
+        restart = None
+        for i in range(1, len(moving)):
+            if moving[i][1] > moving[i - 1][1] + 20 and abs(moving[i][1] - target_s * 1000.0) < 5000:
+                restart = moving[i - 1][0]
+                break
+        f = fit([s for s in moving if restart is not None and s[0] >= restart + 0.3])
+        if restart is None or not f:
+            results.append({"target_s": target_s, "landed_s": None, "note": "no restart seen"})
+            print("[seek] target %.3f -> no restart seen" % target_s)
+            continue
+        landed = predict(f, restart)
+        results.append({"target_s": target_s, "landed_s": round(landed / 1000.0, 3),
+                        "error_ms": round(landed - target_s * 1000.0),
+                        "seek_latency_s": round(restart - t_seek, 2),
+                        "rate_after_ppm": round(f["ppm"])})
+        print("[seek] target %.3f -> landed %.3f (%+d ms) after %.2fs" % (
+            target_s, landed / 1000.0, results[-1]["error_ms"], restart - t_seek))
+        dump(args, "seek-%g" % target_s, {"t_seek": t_seek, "series": series})
     side.write_tempo(1.0)
     print_report("seek", {"tempo": args.seek_tempo, "results": results,
                           "log": side.log_lines("demuxer seek to")[-6:]})
@@ -350,12 +404,12 @@ def scenario_hold(kodi, side, args):
                               "value": {"time": {"hours": 0, "minutes": 1, "seconds": 30, "milliseconds": 0}}})
     time.sleep(2.0)
     t0 = time.monotonic()
-    before = side.log_lines("CRenderManager::Configure - change configuration")
+    before = side.log_lines("CRenderManager::Configure")
     side.write_tempo(args.tempo)
     time.sleep(20.0)
     side.write_tempo(1.0)
     time.sleep(args.lead + 10.0)
-    after = side.log_lines("CRenderManager::Configure - change configuration")
+    after = side.log_lines("CRenderManager::Configure")
     fps = side.log_lines("framerate was:")
     print_report("hold", {"reconfigures_during": len(after) - len(before),
                           "new_lines": after[len(before):][-4:],
@@ -386,6 +440,7 @@ def main(argv):
     ap.add_argument("--seek-tempo", type=float, default=1.03)
     ap.add_argument("--seek-targets", type=float, nargs="*", default=[120.0, 305.5, 60.25])
     ap.add_argument("--no-start", action="store_true", help="use whatever is already playing")
+    ap.add_argument("--dump", default="", help="directory to write raw samples to (JSON per scenario)")
     ap.add_argument("scenarios", nargs="+", choices=["slope", "seek", "track", "hold"])
     args = ap.parse_args(argv)
 
