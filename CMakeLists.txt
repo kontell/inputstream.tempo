@@ -42,6 +42,7 @@ set(TEMPO_HEADERS src/StreamManager.h
                   src/stream/FFmpegCatchupStream.h
                   src/stream/FFmpegLog.h
                   src/stream/FFmpegStream.h
+                  src/stream/TempoMap.h
                   src/stream/CurlCatchupInput.h
                   src/stream/CurlInput.h
                   src/stream/IManageDemuxPacket.h

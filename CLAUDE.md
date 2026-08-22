@@ -22,6 +22,7 @@ This file holds only what is specific to *this* add-on.
 | Path | |
 |---|---|
 | `src/stream/FFmpegStream.cpp/.h` | demuxer, tempo pipeline, seek, time reporting |
+| `src/stream/TempoMap.h` | the content↔output time map every stream is projected through (header-only; `tests/tempomap_test.cpp`) |
 | `src/StreamManager.cpp/.h` | entry point, property parsing, stream lifecycle |
 | `src/utils/Properties.h` | parsed ListItem properties |
 | `resources/lib/runner.py` | background service — window properties, keymap, notifications |
@@ -35,7 +36,14 @@ Set on the ListItem by the calling add-on:
 |---|---|
 | `inputstream.tempo.tempo` | initial speed, e.g. `1.5` |
 | `inputstream.tempo.tempo_file` | path polled for live tempo changes (atomic write) |
-| `inputstream.tempo.start_time` | resume position in seconds — pre-sets `m_currentPts` for `GetTime()` **and** arms the initial seek hold |
+| `inputstream.tempo.start_time` | resume position in seconds — pre-sets `m_currentPts` for `GetTime()` **and** arms the initial seek hold (audio-only items; never for video) |
+| `inputstream.tempo.queue_secs` | depth of Kodi's demux queues in seconds: 8 on Omega (hard-coded), Kodi 22's `videoplayer.queuetimesize` on Piers (default 4). Time is reported this far behind the demux head. Default 8 |
+| `inputstream.tempo.lead_secs` | optional add-on-side lead bound for video items; 0 (default) leaves pacing to Kodi's queues |
+
+The add-on writes back to **`<tempo_file>.state`** — one JSON line, replaced
+atomically, on every applied tempo change, anchor and audio re-target:
+`{"seq","event","tempo","content_ms","output_ms","delta_ms","queue_secs","video"}`.
+A caller confirms a change landed by watching `seq`/`event`.
 
 **Resume seeking is not done here.** The calling add-on sets PAPlayer's
 `audiobook_bookmark`, which PAPlayer applies natively before audio output begins.
@@ -48,9 +56,19 @@ See `kodi-playback-resume`.
 filtered, and re-packaged as PCM float32 in `ProcessAudioPacketWithTempo()`; output
 goes to `m_tempoOutputQueue`, and `DemuxRead()` pops from it.
 
-The tempo file is polled every ~50 packets via `CheckTempoFileUpdate()`. Live
-changes use `avfilter_graph_send_command()` where possible, falling back to a full
-graph rebuild.
+**Every audio stream is advertised as PCM f32** (source codec/bitrate kept for
+the OSD), because any of them may be the one Kodi selects. The pipeline is
+brought up on the first audio stream met and **re-targeted in `OpenStream(id)`**
+(`RetargetTempoAudio`) to whichever track Kodi opens — Kodi re-reads the stream
+properties after `OpenStream` returns true, which is what makes this work. The
+other audio tracks get `AVDISCARD_ALL` and their packets never reach Kodi. If the
+new track cannot be decoded, tempo switches off and all audio streams are
+re-advertised with their real codecs.
+
+The tempo file is polled by wall clock every 250 ms (`kTempoPollInterval`) via
+`CheckTempoFileUpdate()`. Live changes use `avfilter_graph_send_command()` where
+possible, falling back to a full graph rebuild. Each change starts a new map
+segment (below) at the audio's next output packet.
 
 If `BuildFilterGraph` fails, `InitTempoProcessing` clears `m_tempoEnabled` and
 `m_tempoAudioStreamIndex` so the dispatcher routes packets through the passthrough
@@ -71,14 +89,53 @@ bookmark seek lands. Without it, ~50 ms of pts=0 audio leaks to the sink.
 Clears on any `SeekTime(time)` where `time > 100 ms` — so PAPlayer's init
 `SeekTime(0)` does not clear it, and the bookmark seek does. Safety timeout 2 s.
 
-## Dual PTS
+**Not armed for video items** (`m_hasVideo`): VideoPlayer seeks the demuxer
+before any output starts, so the hold would only delay the first picture.
 
-Packet `pts`/`dts` advance at **output** rate for ActiveAE; `dispTime` carries
-**content** rate for the OSD. `GetTimes()` returns a dynamic `ptsStart` computed at
-packet **pop**, updated by `UpdatePtsStartFromPop()` at both `DemuxRead` pop sites,
-and invalidated on `SeekTime`/`DemuxFlush`. At tempo 1.0 the delta is 0.
+## Two domains, one map
 
-Why pop rather than emit, and why this shape at all: `kodi-inputstream`.
+Packet `pts`/`dts` advance at **output** rate for ActiveAE; the OSD wants
+**content** time. `src/stream/TempoMap.h` holds the piecewise-linear map between
+them (slope `1/rate` per segment, a new segment per tempo change) and **every
+stream goes through it**:
+
+- audio: `m_tempoContentPts`/`m_tempoOutputPts` walk the map (content advances
+  `out × rate` per output packet); they anchor on the **first decoded frame's
+  timestamp** (`best_effort_timestamp`, with `pkt_timebase` set so codec priming
+  is already stripped), not the packet dts;
+- video and subtitles: `ProjectPacket()` maps `pts`, `dts` and `duration` in
+  `DemuxRead`'s non-tempo branch. Data untouched.
+
+**Continuity rule.** Δ = content − output changes only while rate ≠ 1 — never at
+a seek or a flush. `ResetTempoMapForSeek()` carries the last Δ Kodi saw
+(`m_deltaReported`, else Δ at the head) into the next anchor. That is what makes
+Kodi's own accurate-seek arithmetic (`startpts = target − time_offset`) land, and
+`SeekTime` returns `*startpts` through the map for the same reason.
+
+**Time is reported at the playing point.** `GetTimes()` returns
+`ptsStart = −Δ(head − queue_secs)`, not Δ at the head: the head runs a queue
+depth ahead of what is playing, and Δ at the head is wrong by `(rate − 1) ×
+queue` while a tempo change runs. Audio-only items use 0 (legacy behaviour;
+PAPlayer never calls `GetTimes`).
+
+**Capability flags.** `IPOSTIME` is advertised only for video items with tempo
+on: VideoPlayer then passes seek targets in content time and calls
+`PosTime()` + `DemuxFlush()`; `PosTime` seeks **backward** itself because Kodi
+drops its flag on that path. Audio-only items keep the legacy flag set so
+PAPlayer's seek/flush sequence is untouched. Why each flag matters:
+`kodi-inputstream`.
+
+**Pacing.** The 2 s wall-clock throttle (sleeping inside `DemuxRead`) applies to
+audio-only items only. For video, `DemuxRead` runs on VideoPlayer's own loop, so
+Kodi's queues pace delivery; `lead_secs > 0` re-enables a bound as empty packets
+with a 10 ms nap. Keep it that way — a long sleep there delays every pause and
+seek.
+
+Test the map without Kodi or FFmpeg:
+
+```bash
+g++ -std=c++17 -I src/stream tests/tempomap_test.cpp -o /tmp/tempomap_test && /tmp/tempomap_test
+```
 
 ## Build
 
@@ -86,6 +143,13 @@ Why pop rather than emit, and why this shape at all: `kodi-inputstream`.
 ./scripts/build.sh --os linux   --arch x86_64 --kodi 21 --kodi-src <kodi>
 ./scripts/build.sh --os android --arch armv7  --kodi 22 --kodi-src <kodi> --ndk <ndk>
 ```
+
+**The Linux zips carry a static libstdc++, so no iostreams in the add-on.**
+CI links with `-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL`; without
+the `--exclude-libs` the `.so` exported 2,499 `std::` symbols and an
+`std::ifstream` bound across the add-on's copy and Kodi's, crashing the flatpak
+Kodi on the first tempo-file poll. Read and write files with C stdio
+(`CheckTempoFileUpdate`, `WriteTempoState`); `std::string`/containers are fine.
 
 Cross-compilation goes through Kodi's own depends system; the four Android traps
 and the dependency-ordering race are in `kodi-android-ndk`. This add-on's
