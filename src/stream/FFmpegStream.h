@@ -291,6 +291,7 @@ private:
   void ProjectPacket(DEMUX_PACKET* pkt, int streamIdx);
   bool RetargetTempoAudio(int streamIdx);
   void WriteTempoState(const char* event);
+  static double ParseTempo(const char* text);
 
   bool InitTempoProcessing(AVStream* audioStream);
   void DestroyTempoProcessing();
