@@ -111,10 +111,26 @@ bool DemuxStreamVideoFFmpeg::GetInformation(kodi::addon::InputstreamInfo& info)
   info.SetBitsPerSample(0);
   info.SetBlockAlign(0);
 
-  info.SetColorSpace(INPUTSTREAM_COLORSPACE_UNSPECIFIED);
-  info.SetColorRange(INPUTSTREAM_COLORRANGE_UNKNOWN);
-  info.SetColorPrimaries(INPUTSTREAM_COLORPRIMARY_UNSPECIFIED);
-  info.SetColorTransferCharacteristic(INPUTSTREAM_COLORTRC_UNSPECIFIED);
+  // The inputstream enums mirror FFmpeg's numbering one-to-one (Kodi casts
+  // them straight back to AVColor* in CInputStreamAddon::GetStream), so a
+  // range-checked cast is the whole mapping. Anything outside the range Kodi
+  // knows degrades to unspecified rather than to garbage.
+  const int space = static_cast<int>(colorSpace);
+  const int range = static_cast<int>(colorRange);
+  const int primaries = static_cast<int>(colorPrimaries);
+  const int trc = static_cast<int>(colorTransferCharacteristic);
+  info.SetColorSpace(space >= 0 && space < static_cast<int>(INPUTSTREAM_COLORSPACE_MAX)
+                         ? static_cast<INPUTSTREAM_COLORSPACE>(space)
+                         : INPUTSTREAM_COLORSPACE_UNSPECIFIED);
+  info.SetColorRange(range >= 0 && range < static_cast<int>(INPUTSTREAM_COLORRANGE_MAX)
+                         ? static_cast<INPUTSTREAM_COLORRANGE>(range)
+                         : INPUTSTREAM_COLORRANGE_UNKNOWN);
+  info.SetColorPrimaries(primaries >= 0 && primaries < static_cast<int>(INPUTSTREAM_COLORPRIMARY_MAX)
+                             ? static_cast<INPUTSTREAM_COLORPRIMARIES>(primaries)
+                             : INPUTSTREAM_COLORPRIMARY_UNSPECIFIED);
+  info.SetColorTransferCharacteristic(trc >= 0 && trc < static_cast<int>(INPUTSTREAM_COLORTRC_MAX)
+                                          ? static_cast<INPUTSTREAM_COLORTRC>(trc)
+                                          : INPUTSTREAM_COLORTRC_UNSPECIFIED);
 
   if (masteringMetaData)
   {

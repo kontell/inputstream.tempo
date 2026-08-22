@@ -92,7 +92,7 @@ jobs:
           # Static C++ runtime on Linux so the .so depends only on glibc, not on a
           # GLIBCXX_3.4.x the target lacks. The superbuild forwards CMAKE_C/CXX_FLAGS
           # but not linker flags, hence LDFLAGS. Empty on Android (NDK's own STL).
-          LDFLAGS: ${{ matrix.os == 'linux' && '-static-libstdc++ -static-libgcc' || '' }}
+          LDFLAGS: ${{ matrix.os == 'linux' && '-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL' || '' }}
         run: |
           ${{ github.workspace }}/${app_id}/scripts/build.sh \
             --os ${{ matrix.os }} \

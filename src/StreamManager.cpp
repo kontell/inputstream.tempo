@@ -166,6 +166,18 @@ bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props
     {
       m_properties.m_startTimeSecs = std::stod(prop.second);
     }
+    else if (TEMPO_QUEUE_SECS == prop.first)
+    {
+      const double secs = std::stod(prop.second);
+      if (secs >= 0.0 && secs <= 60.0)
+        m_properties.m_queueSecs = secs;
+    }
+    else if (TEMPO_LEAD_SECS == prop.first)
+    {
+      const double secs = std::stod(prop.second);
+      if (secs >= 0.0 && secs <= 60.0)
+        m_properties.m_leadSecs = secs;
+    }
   }
 
   m_streamUrl = props.GetURL();
