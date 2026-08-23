@@ -23,7 +23,7 @@ Zips are on the [releases page](https://github.com/kontell/inputstream.tempo/rel
 | 22 "Piers" | `Piers` branch, tags `v22.*` | `22.y.z` |
 | 21 "Omega" | `Omega` branch, tags `v21.*` | `21.y.z` |
 
-The major version is the Kodi version; the rest moves in step across both channels. Platforms: Linux (x86_64, aarch64, armv7), Android (aarch64, armv7). Windows builds are broken and deliberately absent from releases rather than silently empty.
+The major version is the Kodi version; the rest moves in step across both channels. Platforms: Linux (x86_64, aarch64, armv7), Android (aarch64, armv7) and Windows (x86_64).
 
 The Linux zips carry their own libstdc++, so they run on any distribution's Kodi, the flatpak included.
 

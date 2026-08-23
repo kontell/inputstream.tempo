@@ -178,11 +178,10 @@ Publish drafts yourself — `kodi-addon-release` explains why a workflow cannot.
   3.3.0 on Omega and 3.4.0 on Piers), so any upstream bump immediately splits the
   pinned build from current Kodi. `drift.yml` is what makes that arrive as a cron
   failure rather than a user report.
-- **Windows builds are broken, and the failure is deliberately visible.** They
-  compile and upload nothing. The job is `continue-on-error` so releases still ship
-  the working platforms; the release step warns by name and lists the three places
-  to change once it is fixed. See `kodi-addon-release` for the
-  `if-no-files-found` default that made this silent in the first place.
+- **Windows builds ship again** (22.4.1 / 21.4.1 carried an 11 MB `windows-x86_64` zip) and
+  `release.yml` lists `windows-x86_64` among the required assets, so a release with none
+  fails rather than shipping silently empty — the `if-no-files-found` default that once hid
+  this is in `kodi-addon-release`.
 
 Linux builds are **not** in a pinned container yet — this add-on builds far more
 dependency surface than `pvr.kofin`, so the runner label is pinned meanwhile. The
