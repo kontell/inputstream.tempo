@@ -1,0 +1,605 @@
+<title>Tempo for Video</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root {
+    --bg: #F4F6F8;
+    --surface: #FFFFFF;
+    --ink: #18212B;
+    --muted: #5A6573;
+    --rule: #D7DDE4;
+    --rule-strong: #B9C2CC;
+    --out: #0E7C86;
+    --out-tint: #E3F2F3;
+    --con: #8A3B7A;
+    --con-tint: #F3E7F0;
+    --risk: #B3261E;
+    --caution: #8F6400;
+    --good: #2E7D4F;
+    --code-bg: #EBEFF3;
+    --shadow: 0 1px 2px rgba(24, 33, 43, 0.06), 0 8px 24px -12px rgba(24, 33, 43, 0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F141A;
+      --surface: #171E27;
+      --ink: #E5EAF0;
+      --muted: #9DA8B6;
+      --rule: #2B3541;
+      --rule-strong: #3C4858;
+      --out: #5CC8D2;
+      --out-tint: #14282C;
+      --con: #D792C8;
+      --con-tint: #2B1D2A;
+      --risk: #F28B82;
+      --caution: #E2B95B;
+      --good: #79C995;
+      --code-bg: #1F2833;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F141A;
+    --surface: #171E27;
+    --ink: #E5EAF0;
+    --muted: #9DA8B6;
+    --rule: #2B3541;
+    --rule-strong: #3C4858;
+    --out: #5CC8D2;
+    --out-tint: #14282C;
+    --con: #D792C8;
+    --con-tint: #2B1D2A;
+    --risk: #F28B82;
+    --caution: #E2B95B;
+    --good: #79C995;
+    --code-bg: #1F2833;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+  }
+
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 64rem; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+  .prose { max-width: 68ch; }
+  .wide { max-width: none; }
+
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+    font-weight: 700;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h1 { font-size: clamp(2.2rem, 4.5vw, 3.2rem); letter-spacing: -0.015em; font-variation-settings: "opsz" 96; }
+  h2 { font-size: 1.55rem; margin-top: 3.25rem; margin-bottom: 0.9rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.5rem; }
+  p { margin: 0 0 1rem; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.25rem; }
+  li { margin-bottom: 0.4rem; }
+  li > ul { margin-top: 0.4rem; }
+  a { color: var(--out); text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--out); outline-offset: 2px; }
+  strong { font-weight: 600; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+  }
+  .dek { font-size: 1.2rem; line-height: 1.5; color: var(--ink); margin: 1.1rem 0 0; max-width: 60ch; }
+  .meta {
+    margin: 1.25rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+  }
+  header { padding-bottom: 2rem; border-bottom: 1px solid var(--rule); }
+
+  code, pre, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+  }
+  code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 3px; }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    line-height: 1.5;
+    margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; font-size: 0.86rem; }
+  .cite { color: var(--muted); font-size: 0.82em; white-space: nowrap; }
+
+  .verdict {
+    margin-top: 2.25rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 1.6rem 1.8rem 1.4rem;
+  }
+  .verdict h2 { margin-top: 0; font-size: 1.45rem; }
+  .verdict .lede { font-size: 1.05rem; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 2rem; margin-top: 1.25rem; }
+  @media (max-width: 46rem) { .cols { grid-template-columns: 1fr; } }
+  .col h3 { margin-top: 0; font-size: 0.8rem; font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; }
+  .col.buys h3 { color: var(--good); }
+  .col.costs h3 { color: var(--caution); }
+  .col ul { margin-bottom: 0; }
+  .recommend {
+    margin: 1.4rem -1.8rem -1.4rem;
+    padding: 0.9rem 1.8rem 1rem;
+    border-top: 1px solid var(--rule);
+    background: var(--out-tint);
+    border-radius: 0 0 8px 8px;
+    font-size: 0.95rem;
+  }
+  .recommend p { margin: 0; }
+
+  nav.toc { margin-top: 2.5rem; font-size: 0.92rem; }
+  nav.toc ol { columns: 2; column-gap: 2rem; padding-left: 1.1rem; margin: 0; }
+  @media (max-width: 46rem) { nav.toc ol { columns: 1; } }
+  nav.toc li { break-inside: avoid; margin-bottom: 0.25rem; }
+  nav.toc a { color: var(--ink); text-decoration: none; }
+  nav.toc a:hover { color: var(--out); text-decoration: underline; }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1.25rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; line-height: 1.45; }
+  th, td { text-align: left; vertical-align: top; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--rule); }
+  th { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tbl-wrap table td:first-child { font-weight: 500; }
+
+  figure { margin: 1.5rem 0 2rem; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--ink); }
+  figcaption { font-size: 0.88rem; color: var(--muted); margin-top: 0.6rem; max-width: 70ch; }
+  .fig-surface { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 1rem; overflow-x: auto; }
+
+  .callout {
+    border-left: 3px solid var(--out);
+    background: var(--surface);
+    padding: 0.8rem 1.1rem;
+    margin: 0 0 1.25rem;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout.con { border-left-color: var(--con); }
+  .callout.risk { border-left-color: var(--risk); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.1em 0.55em;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    vertical-align: middle;
+    margin-right: 0.3rem;
+  }
+  .pill.risk { color: var(--risk); }
+  .pill.caution { color: var(--caution); }
+  .pill.good { color: var(--good); }
+  .pill.out { color: var(--out); }
+  .pill.con { color: var(--con); }
+
+  .phases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0 1.5rem; }
+  @media (max-width: 52rem) { .phases { grid-template-columns: 1fr; } }
+  .phase { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 1rem 1.1rem; font-size: 0.92rem; }
+  .phase h3 { margin-top: 0; font-size: 1rem; }
+  .phase .effort { color: var(--muted); font-size: 0.82rem; font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .phase ul { margin: 0.6rem 0 0; padding-left: 1.1rem; }
+
+  .sources { font-size: 0.86rem; color: var(--muted); }
+  .sources code { font-size: 0.95em; }
+  hr.end { border: 0; border-top: 1px solid var(--rule); margin: 3rem 0 1.5rem; }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color 120ms ease; } }
+</style>
+
+<div class="page">
+<header>
+  <p class="eyebrow">inputstream.tempo · feasibility study · 2026-08-21</p>
+  <h1>Tempo for Video</h1>
+  <p class="dek">Can the add-on's pitch-corrected rate control cover audio <em>and</em> video, so kofin SyncPlay gets a fine speed/position actuator that does not depend on Kodi's <em>Sync playback to display</em> setting?</p>
+  <div class="meta">
+    <span>Read against Kodi 21 <code>ref/kodi-omega-full</code> and Kodi 22 <code>ref/kodi-piers-full</code> (22.0b1+731)</span>
+    <span>inputstream.tempo 21.3.11 (Omega branch)</span>
+    <span>kofin <code>docs/syncplay-drift-shakedown.md</code></span>
+    <span>Nothing executed — every Kodi claim below is source-read; §8 lists what still has to be measured</span>
+  </div>
+</header>
+
+<section class="verdict" id="verdict">
+  <h2>Yes — and it is the only add-on-level actuator that works with the display clock off.</h2>
+  <p class="lede">The add-on already keeps two clocks for audio: packet <code>pts</code> at <span style="color:var(--out)">output rate</span> for ActiveAE, and <span style="color:var(--con)">content time</span> for the OSD through a dynamic <code>ptsStart</code>. Video does not need decoding — its packets need their timestamps projected through the same content→output map the audio path already maintains. Everything Kodi does downstream (audio-master clock, renderer following the clock, OSD, external subtitles, accurate seeks) keys off two fields the add-on controls: <code>ptsStart</code>/<code>time_offset</code> and <code>startpts</code>. So this is timestamp arithmetic plus four pieces of plumbing, not a new pipeline.</p>
+  <div class="cols">
+    <div class="col buys">
+      <h3>What it buys kofin</h3>
+      <ul>
+        <li>A rate actuator on the configuration the shakedown found tightest — display clock <strong>off</strong>, where all three members tracked real time within ±200 ppm — with no panel-imposed bias to fight.</li>
+        <li>Pitch-corrected, and invisible to Kodi's tempo OSD: Kodi's own tempo stays 1.0, so <code>Player.IsTempo</code> never flickers.</li>
+        <li>Fine <strong>position</strong> trims where seeks cannot land: transcodes snap to segment boundaries; a 2 % pulse for 10 s moves 200 ms smoothly.</li>
+        <li>Audio-only items get the same actuator for free — that is today's PAPlayer path.</li>
+      </ul>
+    </div>
+    <div class="col costs">
+      <h3>What it costs</h3>
+      <ul>
+        <li><strong>Passthrough is lost</strong> whenever the add-on is in the path: it hands Kodi PCM f32. Scope it to SyncPlay sessions.</li>
+        <li>A change takes effect only after the already-queued packets play out: ≈4 s on Piers by default, 8 s on Omega. The controller must be built for dead time.</li>
+        <li>The position Kodi reports is biased by (r−1)·L while a nudge runs unless the add-on compensates — §4.3 shows how.</li>
+        <li>A sustained rate change can make Kodi re-detect the frame rate and rebuild its renderer — a brief hiccup; a display-mode switch is unlikely.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="recommend"><p><strong>Recommendation.</strong> Build it in three phases — add-on core, kofin wiring, rig measurement (§7) — gate it on direct play first, and treat Piers as the primary target: its demux queue is a user setting, which is the lever that turns a 9 s dead time into 2 s.</p></div>
+</section>
+
+<nav class="toc" aria-label="Contents">
+  <ol>
+    <li><a href="#why">Why this lever</a></li>
+    <li><a href="#today">What the add-on does today</a></li>
+    <li><a href="#kodi">How Kodi will treat it</a></li>
+    <li><a href="#design">Design</a></li>
+    <li><a href="#costs">Costs, limits, and where it bites</a></li>
+    <li><a href="#alternatives">Alternatives considered</a></li>
+    <li><a href="#plan">Plan and effort</a></li>
+    <li><a href="#verify">What to measure first</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<section class="prose" id="why">
+  <h2>1. Why this lever</h2>
+  <p>Kodi's native <code>Player.SetTempo</code> exists only while <code>videoplayer.usedisplayasclock</code> is on (<span class="cite">VideoPlayer.cpp:4917–4925; Piers <code>CanTempo()</code> :5765</span>), and that setting slaves the media clock to the panel. The shakedown's Gate 0 measured what that costs on the three Piers members:</p>
+</section>
+<div class="tbl-wrap" style="max-width:44rem">
+<table>
+  <thead><tr><th>Member</th><th class="num">Display clock on</th><th class="num">Display clock off</th></tr></thead>
+  <tbody>
+    <tr><td>Bravia (23.976 on 50 Hz)</td><td class="num">+42 764 ppm</td><td class="num">−70 ppm</td></tr>
+    <tr><td>Pixel 7 Pro</td><td class="num">−6 287 ppm</td><td class="num">+204 ppm</td></tr>
+    <tr><td>Galaxy Tab S5e</td><td class="num">+4 761 ppm</td><td class="num">+21 ppm</td></tr>
+  </tbody>
+</table>
+</div>
+<section class="prose">
+  <p>The actuator kofin needs exists only in the mode that ruins the clock it is trying to correct; with the mode off the clock is already good to 200 ppm and there is no actuator. The controller was removed for that reason (<span class="cite">playback.py, class docstring; shakedown §10</span>).</p>
+  <p>An inputstream add-on changes the <em>content</em> instead of the clock. With the display-clock setting off and a non-realtime stream, VideoPlayer runs audio in <code>SYNC_DISCON</code>: the audio sink's progress <em>is</em> the clock (<span class="cite">VideoPlayerAudio.cpp:133–138</span>). Feed that sink PCM that has been time-stretched by <code>atempo</code>, stamp the packets at output rate, and the clock keeps its ±200 ppm honesty while the media runs 3 % faster. Video only has to carry timestamps that agree.</p>
+</section>
+
+<section class="prose" id="today">
+  <h2>2. What the add-on does today</h2>
+  <p>inputstream.tempo is ffmpegdirect with an audio branch grafted into <code>DemuxRead</code>. The parts that matter for video, and what each needs to become:</p>
+</section>
+<div class="tbl-wrap wide">
+<table>
+  <thead><tr><th style="width:14%">Component</th><th style="width:46%">Today</th><th>For video</th></tr></thead>
+  <tbody>
+    <tr><td>Audio</td><td>The first audio stream <code>AddStream</code> meets is decoded → <code>atempo</code> → PCM f32. Packet <code>pts</code> comes from the output sample count; a parallel <code>m_tempoContentPts</code> advances by <code>out × r</code> <span class="cite">FFmpegStream.cpp:3057–3200</span>.</td><td>Keep. Its two counters are the source of truth for the map.</td></tr>
+    <tr><td>Video, subtitles</td><td>Pass through the non-tempo branch untouched, with <strong>content-rate</strong> <code>pts</code>/<code>dts</code>/<code>duration</code> <span class="cite">:≈530–562</span>. At r ≠ 1 they would drift from the audio.</td><td>Project <code>pts</code>, <code>dts</code> and <code>duration</code> through the map. No decoding, no copying beyond what happens now.</td></tr>
+    <tr><td>Time reporting</td><td><code>GetTimes()</code> returns <code>ptsStart = output − content</code> of the last <em>popped</em> audio packet <span class="cite">:719–744</span>; VideoPlayer takes the ITimes branch first <span class="cite">VideoPlayer.cpp:4858–4868</span>.</td><td>Keep ITimes, but evaluate <code>ptsStart</code> at the playing point rather than the demux head (§4.3).</td></tr>
+    <tr><td>Seeks</td><td><code>SeekTime</code> seeks the default stream (<code>m_seekStream = -1</code> → keyframe-aligned), returns <code>*startpts</code> = the requested content time <span class="cite">:1564–1725</span>. <code>IPOSTIME</code> is not advertised <span class="cite">:225–235</span>, so VideoPlayer converts seek targets to output time before calling <span class="cite">VideoPlayer.cpp:2702–2703</span>.</td><td>Advertise <code>IPOSTIME</code>, seek in content time, and let Kodi compute the output-domain <code>startpts</code> — which is only right under the continuity rule of §4.2.</td></tr>
+    <tr><td>Audio track</td><td>Whichever audio stream comes first in the file <span class="cite">:≈2157</span>; <code>EnableStream</code> and <code>OpenStream</code> are no-ops <span class="cite">:268–275</span>. A second track would reach Kodi compressed, with content-rate timestamps.</td><td>Re-target the pipeline inside <code>OpenStream(id)</code> and advertise every audio stream as PCM (§4.4).</td></tr>
+    <tr><td>Pacing</td><td>Wall-clock throttle: at most 2 s of output ahead of real time, enforced by <em>sleeping inside</em> <code>DemuxRead</code> <span class="cite">:≈3166–3190</span>. Tuned for PAPlayer.</td><td>Under VideoPlayer the player loop calls <code>DemuxRead</code>; never block it longer than ~10 ms. The throttle's lead bound is best-effort only (§4.5).</td></tr>
+    <tr><td>Tempo IPC</td><td>File polled every 50 <code>DemuxRead</code> calls <span class="cite">:≈378</span>; live change via <code>avfilter_graph_send_command</code> <span class="cite">:3019–3055</span>. Path shared with koshelf (<code>special://temp/inputstream_tempo</code>).</td><td>Poll by wall clock; per-session file; write back what was applied and when (§4.6).</td></tr>
+    <tr><td>Service</td><td>Window properties only while <code>isPlayingAudio()</code> and koshelf's sentinel exists <span class="cite">runner.py:≈106</span>; PgUp/PgDn keymap drives <code>speed.py</code>.</td><td>Include video; keep the sentinel koshelf's so the keymap never touches a SyncPlay session.</td></tr>
+    <tr><td>Stream info</td><td>Colour primaries/space/transfer/range are reported <code>UNSPECIFIED</code> <span class="cite">DemuxStream.cpp:114–117</span> (upstream does the same) although <code>AddStream</code> collects them; Kodi would import them <span class="cite">InputStreamAddon.cpp:437–445</span>.</td><td>Map them — a cheap HDR10 parity fix that belongs in the same change.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="prose" id="kodi">
+  <h2>3. How Kodi will treat it</h2>
+  <p>Every item here was read in the Kodi 21 tree and checked against Piers; where the two differ it is noted. Line numbers are Kodi 21 unless marked.</p>
+  <ul>
+    <li><strong>Clock.</strong> Display clock off + non-realtime → <code>SYNC_DISCON</code>; the audio sink drives <code>CDVDClock</code> <span class="cite">VideoPlayerAudio.cpp:133–138</span>. The renderer presents each picture when the clock reaches its <code>pts</code>. A continuous, monotone timestamp map therefore keeps A/V locked at any rate; Kodi's discontinuity detector only fires on jumps &gt; 1 s forward or 500 ms backward (<code>CheckContinuity</code>).</li>
+    <li><strong>OSD and <code>getTime()</code>.</strong> <code>state.time = clock − ptsStart</code>, <code>time_offset = −ptsStart</code>, <code>timeMax = ptsEnd − ptsStart</code> <span class="cite">VideoPlayer.cpp:4858–4868; Piers :5573–5625, identical</span>. The IDisplayTime branch is only a fallback, and <code>CDVDDemuxClient::Read</code> overwrites the add-on's per-packet <code>dispTime</code> anyway <span class="cite">DVDDemuxClient.cpp:357–373</span>.</li>
+    <li><strong>Seeks.</strong> Relative seeks add <code>time_offset</code> to the clock; absolute targets are converted to output time <em>unless</em> the stream has <code>IPOSTIME</code> <span class="cite">:2692–2703; Piers :3003–3017</span>. With <code>IPOSTIME</code>, Kodi calls <code>PosTime()</code> then <code>FlushDemux()</code>, returns no <code>startpts</code>, and computes <code>start = target − time_offset</code> itself <span class="cite">InputStreamAddon.cpp:588–600 → VideoPlayer.cpp:2716</span>. The <code>backward</code> flag is <em>not</em> forwarded on that path, so <code>PosTime</code> must seek with <code>AVSEEK_FLAG_BACKWARD</code> or video starts a GOP late. Accurate seeks then drop packets until <code>dts ≥ startpts</code>, with a 20 s sanity reset <span class="cite">:2212–2254</span>. Resume at start uses the requested time directly <span class="cite">:1331–1338</span>.</li>
+    <li><strong>External subtitles.</strong> Parsed at <code>clock + time_offset</code> and shifted by <code>−time_offset</code> into the clock domain <span class="cite">VideoPlayer.cpp:1432; VideoPlayerSubtitle.cpp <code>Process</code></span>. They follow the same field the OSD uses, so getting §4.3 right fixes both.</li>
+    <li><strong>Opening a stream.</strong> <code>CVideoPlayer::OpenStream</code> calls the add-on's <code>OpenStream(id)</code> first; if that returns <code>true</code>, Kodi re-reads the stream's properties <em>before</em> building the decoder hint <span class="cite">DVDDemuxClient.cpp:731–745; VideoPlayer.cpp:3542–3600</span>. <code>EnableStream(false)</code> arrives on close <span class="cite">:3931</span>. That ordering is what makes audio-track switching possible from inside the add-on.</li>
+    <li><strong>Queues.</strong> Omega: 8 s per stream, hard-coded <span class="cite">VideoPlayerAudio.cpp:66; VideoPlayerVideo.cpp:72</span>. Piers: <code>videoplayer.queuetimesize</code>, a user setting with options 0.5 / 1 / 2 / 4 / 8 / 16 s, default 4 s, read in the <code>CVideoPlayer</code> constructor <span class="cite">Piers VideoPlayer.cpp:775–777; settings.xml:956; PlayerSettings.cpp</span>. Fullness is the dts span of queued packets <span class="cite">DVDMessageQueue.cpp:310–330</span>; the player reads ahead until a queue is full <span class="cite">VideoPlayer.cpp:1452–1463</span>.</li>
+    <li><strong>Buffering.</strong> Add-on streams have no cache status (<span class="cite">DVDInputStream.h:187</span>), so after a stall <code>CACHESTATE_FULL</code> is released only when a queue <em>fills</em> (<code>HandlePlaySpeed</code>). An add-on that holds delivery back does not wedge this — its wall-clock cap keeps filling while playback is paused — but it does slow the recovery by up to the queue depth, and loses its lead bound afterwards (§4.5).</li>
+    <li><strong>Frame-rate detection.</strong> <code>CalcFrameRate</code> runs regardless of the display-clock setting (gated only by <code>videofpsdetect</code>), tolerance 0.01 fps, measurement windows 1→2→4→…→64 s, and it is <strong>restarted on every flush</strong> — i.e. every seek <span class="cite">VideoPlayerVideo.cpp:1009–1080, :474</span>. A changed rate flows into <code>CRenderManager::Configure</code>, which tears down and recreates the renderer <span class="cite">RenderManager.cpp:81–95, 157–171</span> and, with <em>Adjust refresh rate</em> on, re-runs mode selection <span class="cite">:879–897</span>. A mode only switches on an exact 0.01 Hz refresh match <span class="cite">Resolution.cpp <code>FindResolutionFromWhitelist</code></span>, which a nudged rate essentially never produces.</li>
+    <li><strong>Passthrough.</strong> Allowed only with the display clock off and no resampling <span class="cite">VideoPlayerAudio.cpp:653–655</span> — moot here, because the add-on delivers PCM.</li>
+    <li><strong>Post-seek discard.</strong> The add-on's <code>SeekTime</code> reads and frees packets until it knows a pts; Kodi's own <code>CDVDDemuxFFmpeg::SeekTime</code> does exactly the same. Parity, not a regression.</li>
+  </ul>
+</section>
+
+<section class="prose" id="design">
+  <h2>4. Design</h2>
+  <p>The shape of the change, as a picture first:</p>
+</section>
+<figure class="wide">
+  <div class="fig-surface">
+  <svg viewBox="0 0 900 340" role="img" aria-label="inputstream.tempo demuxes the file, stretches the audio with atempo and stamps it at output rate, projects video and subtitle timestamps through the same map, and reports ptsStart so Kodi's OSD reads content time while the ActiveAE sink sets the clock and the renderer follows it." xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="12">
+    <defs>
+      <marker id="ar-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+      <marker id="ar-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--out)"/></marker>
+      <marker id="ar-con" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--con)"/></marker>
+    </defs>
+
+    <!-- legend -->
+    <line x1="250" y1="22" x2="286" y2="22" stroke-width="2.5" style="stroke:var(--con)"/>
+    <text x="294" y="26" fill="currentColor">content-time domain — where the media really is</text>
+    <line x1="250" y1="42" x2="286" y2="42" stroke-width="2.5" style="stroke:var(--out)"/>
+    <text x="294" y="46" fill="currentColor">output-time domain — what ActiveAE and the renderer see</text>
+
+    <!-- tempo file -->
+    <rect x="20" y="24" width="150" height="48" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="95" y="45" text-anchor="middle" font-weight="600" fill="currentColor">tempo file</text>
+    <text x="95" y="62" text-anchor="middle" fill="currentColor" opacity="0.7">kofin writes r</text>
+    <line x1="95" y1="72" x2="95" y2="148" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar-ink)"/>
+    <text x="102" y="114" fill="currentColor" opacity="0.7">polls r</text>
+
+    <!-- demuxer -->
+    <rect x="20" y="150" width="150" height="64" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="95" y="175" text-anchor="middle" font-weight="600" fill="currentColor">inputstream.tempo</text>
+    <text x="95" y="193" text-anchor="middle" fill="currentColor" opacity="0.7">demux · map M(t)</text>
+
+    <!-- audio box -->
+    <rect x="250" y="70" width="270" height="64" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="385" y="95" text-anchor="middle" font-weight="600" fill="currentColor">audio: decode → atempo(r) → PCM f32</text>
+    <text x="385" y="113" text-anchor="middle" fill="currentColor" opacity="0.7">pts from the sample count = output rate</text>
+
+    <!-- video box -->
+    <rect x="250" y="226" width="270" height="64" rx="4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="385" y="251" text-anchor="middle" font-weight="600" fill="currentColor">video + subtitle packets, data untouched</text>
+    <text x="385" y="269" text-anchor="middle" fill="currentColor" opacity="0.7">pts, dts, duration ↦ M(·)</text>
+
+    <!-- demuxer -> audio / video (content domain) -->
+    <line x1="170" y1="170" x2="248" y2="104" stroke-width="1.6" style="stroke:var(--con)" marker-end="url(#ar-con)"/>
+    <text x="206" y="126" text-anchor="middle" style="fill:var(--con)">audio pkts</text>
+    <line x1="170" y1="196" x2="248" y2="254" stroke-width="1.6" style="stroke:var(--con)" marker-end="url(#ar-con)"/>
+    <text x="206" y="244" text-anchor="middle" style="fill:var(--con)">video / sub pkts</text>
+
+    <!-- Kodi box -->
+    <rect x="600" y="58" width="280" height="262" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text x="612" y="80" font-weight="600" fill="currentColor">Kodi VideoPlayer</text>
+    <rect x="616" y="92" width="248" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.85"/>
+    <text x="740" y="117" text-anchor="middle" fill="currentColor">audio queue · 8 s Omega / 4 s Piers</text>
+    <rect x="616" y="140" width="248" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.85"/>
+    <text x="740" y="162" text-anchor="middle" fill="currentColor">ActiveAE sink → sets the clock</text>
+    <rect x="616" y="196" width="248" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.85"/>
+    <text x="740" y="221" text-anchor="middle" fill="currentColor">video queue</text>
+    <rect x="616" y="244" width="248" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.85"/>
+    <text x="740" y="266" text-anchor="middle" fill="currentColor">renderer presents at clock ≥ pts</text>
+    <rect x="616" y="286" width="248" height="28" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.85"/>
+    <text x="740" y="305" text-anchor="middle" fill="currentColor">state.time = clock − ptsStart</text>
+
+    <!-- boxes -> Kodi (output domain) -->
+    <line x1="520" y1="102" x2="614" y2="112" stroke-width="1.6" style="stroke:var(--out)" marker-end="url(#ar-out)"/>
+    <text x="566" y="96" text-anchor="middle" style="fill:var(--out)">output-rate pts</text>
+    <line x1="520" y1="258" x2="614" y2="218" stroke-width="1.6" style="stroke:var(--out)" marker-end="url(#ar-out)"/>
+    <text x="572" y="250" text-anchor="middle" style="fill:var(--out)">mapped pts</text>
+
+    <!-- GetTimes -> state.time (content reference) -->
+    <polyline points="95,214 95,300 614,300" fill="none" stroke-width="1.6" stroke-dasharray="6 4" style="stroke:var(--con)" marker-end="url(#ar-con)"/>
+    <text x="300" y="294" style="fill:var(--con)">GetTimes(): ptsStart = output − content</text>
+  </svg>
+  </div>
+  <figcaption>The add-on owns both time domains. Audio is stretched and stamped at output rate so the sink — and therefore the clock — runs at real time; video and subtitle packets carry the same mapping so they stay locked to it; <code>ptsStart</code> tells Kodi how far content time has pulled ahead of the clock, which is what the OSD, <code>getTime()</code> and external subtitles read.</figcaption>
+</figure>
+
+<section class="prose">
+  <h3>4.1 One map for every stream</h3>
+  <p>Define <code>M: content → output</code>, piecewise-linear with slope <code>1/r<sub>k</sub></code> in each segment k, where a segment starts each time the tempo changes. The audio path already walks this map — <code>m_tempoOutputPts</code> advances by the output duration, <code>m_tempoContentPts</code> by <code>output × r</code>. Video and subtitle packets then get:</p>
+  <pre><code>pts'      = M(pts)
+dts'      = M(dts)           // monotone map, so dts' ≤ pts' is preserved
+duration' = duration / r_k   // text subtitles carry their display time here too</code></pre>
+  <p>Keep a short list of segment anchors <code>(content<sub>k</sub>, output<sub>k</sub>, r<sub>k</sub>)</code>: packets in flight are interleaved within about a second of the audio, so a video packet arriving just after a tempo change may still belong to the previous segment, and the list resolves that exactly. Accuracy is not a concern: <code>atempo</code>'s analysis window (~40 ms) and codec priming add a <em>constant</em> A/V offset of tens of milliseconds, inside Kodi's own tolerance, and the transient a tempo change introduces is window × Δr ≈ 2 ms, which reverses when the rate returns.</p>
+
+  <h3>4.2 The continuity rule</h3>
+  <p>Let <code>Δ = content − output</code>. Δ must change only while r ≠ 1 — never at a seek, never at a flush. Today <code>DemuxFlush</code> zeroes the counters and <code>SeekTime</code> re-anchors output to the first audio packet's dts <span class="cite">FFmpegStream.cpp:309–318, 3070–3080</span>, which resets Δ to 0. That is harmless while only audio is shifted, but it breaks the <code>IPOSTIME</code> path: Kodi computes the drop-until point as <code>target − time_offset</code> using the Δ it last saw, so new packets must continue from exactly that Δ. Anchor post-seek packets at <code>output = content − Δ<sub>reported</sub></code>, anchor on the first packet of <em>any</em> mapped stream (today only audio anchors, and video usually arrives first), and the OSD stops blinking at seeks as a side effect.</p>
+
+  <h3>4.3 Report time at the playing point, not the demux head</h3>
+  <p>The current <code>ptsStart</code> is Δ of the last packet popped — the demux head, which runs L seconds ahead of what is playing (L ≈ the queue depth in steady state). Δ grows at (r−1) per second while a nudge runs, so Kodi's reported position is wrong by:</p>
+</section>
+<div class="tbl-wrap" style="max-width:44rem">
+<table>
+  <thead><tr><th>Rate r</th><th class="num">L = 2 s</th><th class="num">L = 4 s (Piers default)</th><th class="num">L = 8 s (Omega)</th></tr></thead>
+  <tbody>
+    <tr><td>1.01</td><td class="num">20 ms</td><td class="num">40 ms</td><td class="num">80 ms</td></tr>
+    <tr><td>1.02</td><td class="num">40 ms</td><td class="num">80 ms</td><td class="num">160 ms</td></tr>
+    <tr><td>1.03</td><td class="num">60 ms</td><td class="num">120 ms</td><td class="num">240 ms</td></tr>
+  </tbody>
+</table>
+</div>
+<section class="prose">
+  <p>That bias ramps in over L seconds, holds at (r−1)·L, and ramps out over L after the rate returns — and it is the same size as the errors SyncPlay is trying to close. A controller that reads position during a nudge would chase it. Two complementary fixes:</p>
+  <ul>
+    <li><strong>In the add-on:</strong> keep a ring of <code>(output_pts, Δ)</code> recorded at each pop and have <code>GetTimes()</code> report the Δ for <code>output_head − Q</code>, where Q is the queue depth passed as a property (<code>inputstream.tempo.queue_secs</code>; kofin supplies the Piers setting, 8 for Omega). The residual is (r−1)·|L<sub>actual</sub> − Q|: zero in steady state, and during refills after a seek Δ is constant anyway because r = 1. This also makes external subtitles land on the playing frame during a nudge.</li>
+    <li><strong>In kofin:</strong> treat nudges as pulses and measure between them — after r has been 1 for Q + 1 s — rather than running a continuous loop against a biased reading.</li>
+  </ul>
+
+  <h3>4.4 Audio-track switching</h3>
+  <p>Advertise <em>every</em> audio stream as <code>pcm_f32le</code> with the source codec, bitrate and bit depth kept for the OSD, as the tempo stream does now. Language, default flag and channel count stay truthful, so Kodi's own selection logic is unaffected. In <code>OpenStream(id)</code> for an audio stream: tear down the pipeline for the previous track, build decoder and graph for the new one, set <code>AVDISCARD_ALL</code> on the others, and return <code>true</code> so Kodi re-reads the properties before creating the decoder (§3). <code>EnableStream(false)</code> confirms the old track is gone. Kodi flushes around a track change anyway, so the map re-anchors under the continuity rule like any seek.</p>
+
+  <h3>4.5 Dead time and pacing</h3>
+  <p>A write to the tempo file is heard only after three delays: the poll, everything Kodi has already queued, and the sink.</p>
+</section>
+<figure class="wide">
+  <div class="fig-surface">
+  <svg viewBox="0 0 900 200" role="img" aria-label="Timeline of the delay between kofin writing a new tempo and the change being heard: a short poll, then the packets already queued by Kodi (up to 8 seconds on Omega, 4 by default on Piers), then the sink." xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="12">
+    <defs>
+      <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+    </defs>
+    <!-- axis -->
+    <line x1="60" y1="132" x2="870" y2="132" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+    <g fill="currentColor" opacity="0.75" text-anchor="middle">
+      <line x1="100" y1="128" x2="100" y2="136" stroke="currentColor"/><text x="100" y="152">0 s</text>
+      <line x1="260" y1="128" x2="260" y2="136" stroke="currentColor"/><text x="260" y="152">2 s</text>
+      <line x1="420" y1="128" x2="420" y2="136" stroke="currentColor"/><text x="420" y="152">4 s</text>
+      <line x1="580" y1="128" x2="580" y2="136" stroke="currentColor"/><text x="580" y="152">6 s</text>
+      <line x1="740" y1="128" x2="740" y2="136" stroke="currentColor"/><text x="740" y="152">8 s</text>
+      <text x="860" y="152">wall time</text>
+    </g>
+    <!-- events -->
+    <line x1="100" y1="44" x2="100" y2="126" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3"/>
+    <text x="100" y="36" text-anchor="middle" font-weight="600" fill="currentColor">kofin writes r</text>
+    <line x1="820" y1="44" x2="820" y2="126" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3"/>
+    <text x="820" y="36" text-anchor="middle" font-weight="600" fill="currentColor">heard / seen</text>
+    <!-- bars -->
+    <rect x="100" y="92" width="56" height="24" rx="2" style="fill:var(--con-tint);stroke:var(--con)" stroke-width="1"/>
+    <text x="128" y="84" text-anchor="middle" style="fill:var(--con)">poll ≤ 0.7 s</text>
+    <rect x="156" y="92" width="640" height="24" rx="2" style="fill:var(--out-tint);stroke:var(--out)" stroke-width="1"/>
+    <text x="476" y="108" text-anchor="middle" style="fill:var(--out)">packets already queued by Kodi — Omega: 8 s, fixed</text>
+    <rect x="156" y="58" width="320" height="16" rx="2" style="fill:var(--out-tint);stroke:var(--out)" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="486" y="71" style="fill:var(--out)">Piers: 4 s default · user setting 0.5–16 s</text>
+    <rect x="796" y="92" width="24" height="24" rx="2" style="fill:var(--con-tint);stroke:var(--con)" stroke-width="1"/>
+    <text x="808" y="84" text-anchor="middle" style="fill:var(--con)">sink ≈ 0.3 s</text>
+  </svg>
+  </div>
+  <figcaption>Dead time from the file write to the new rate being audible. The poll (~50 demux reads ≈ 0.7 s at typical packet rates; replace it with a wall-clock poll of 100–250 ms) and the sink are small; the queue is the budget, and on Piers it is a setting.</figcaption>
+</figure>
+<section class="prose">
+  <p>Three consequences for the design:</p>
+  <ul>
+    <li><strong>Never block the player loop.</strong> Under VideoPlayer, <code>DemuxRead</code> runs on the thread that handles pause and seek messages; today's throttle sleeps up to a second there. Cap any wait at ~10 ms and return.</li>
+    <li><strong>The add-on's lead bound is best-effort.</strong> The 2 s throttle holds from a clean start, but after any pause or buffering stall Kodi's queue fills to its maximum and the add-on has no safe way to re-establish a smaller lead without observing playback, which it cannot. Keep the throttle so Kodi's <code>CACHESTATE_FULL</code> still releases (it fills at wall rate while playback is paused), and design the controller for <code>Q + 1 s</code>.</li>
+    <li><strong>On Piers, use the setting.</strong> <code>videoplayer.queuetimesize</code> at 1–2 s is ample for LAN direct play — Kodi's file cache sits <em>below</em> the demuxer in curl open mode, so network jitter is still absorbed — and it is the one lever that brings dead time to ≈2 s. It is read when the player object is constructed, so kofin should set it before a session and restore it after; whether a stop is needed between the two is in §8.</li>
+  </ul>
+</section>
+<div class="tbl-wrap" style="max-width:44rem">
+<table>
+  <thead><tr><th>Configuration</th><th class="num">Dead time</th><th class="num">Readout bias at 3 %, uncorrected</th></tr></thead>
+  <tbody>
+    <tr><td>Omega (8 s fixed)</td><td class="num">≈ 9 s</td><td class="num">240 ms</td></tr>
+    <tr><td>Piers default (4 s)</td><td class="num">≈ 5 s</td><td class="num">120 ms</td></tr>
+    <tr><td>Piers at 1 s</td><td class="num">≈ 2 s</td><td class="num">30 ms</td></tr>
+    <tr><td>Piers at 0.5 s</td><td class="num">≈ 1.5 s</td><td class="num">15 ms</td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="prose">
+  <h3>4.6 IPC between kofin and the add-on</h3>
+  <ul>
+    <li><strong>Per-session tempo file</strong> via the existing <code>inputstream.tempo.tempo_file</code> property. koshelf owns <code>special://temp/inputstream_tempo</code>; sharing it would let an audiobook session and a SyncPlay session write over each other.</li>
+    <li><strong>Poll by wall clock</strong> (mtime check every 100–250 ms) instead of every 50 reads, so latency does not depend on packet rate.</li>
+    <li><strong>Write back</strong> a small state file beside it — applied tempo, the content time at which it took effect, the current Δ — so kofin can confirm a pulse landed and reason about it without guessing.</li>
+    <li>Leave the <code>ACTIVE</code> sentinel and the PgUp/PgDn keymap to koshelf. kofin never writes the sentinel, so the keys cannot change a SyncPlay member's speed.</li>
+  </ul>
+
+  <h3>4.7 Parity with Kodi's own demuxer</h3>
+  <ul>
+    <li><strong>HDR10:</strong> map the four colour fields (§2). Static metadata already passes.</li>
+    <li><strong>Dolby Vision:</strong> MP4 with <code>dvhe</code>/<code>dvh1</code> works — Kodi's MediaCodec path reads the fourcc <span class="cite">DVDVideoCodecAndroidMediaCodec.cpp:523–533</span>. MKV Dolby Vision relies on <code>hdrType</code>, which the inputstream ABI cannot carry on 21 or 22, so it plays as plain HEVC: fine for profile 8.1 (HDR10 base layer), wrong colours for profile 5. Either exclude profile-5 MKV on Android from the tempo path or accept it for SyncPlay sessions.</li>
+    <li><strong>HLS transcodes:</strong> the add-on opens HLS through ffmpeg's own demuxer (ffmpeg open mode), not Kodi's HLS handling. Start-up, duration and growing-playlist behaviour need their own check before transcodes are routed this way — and transcodes are where position pulses are worth the most, because seeks snap to segments. Phase 2.</li>
+    <li><strong>Network buffering:</strong> plain http(s) opens in curl mode, through Kodi's <code>CFile</code> and its cache, so the user's buffer settings still apply.</li>
+  </ul>
+
+  <h3>4.8 Wiring it into kofin</h3>
+  <p>At play time, when all of <em>SyncPlay session</em>, <em>video item</em>, <em>direct play or direct stream</em>, and <em>passthrough off or the user opted in</em> hold: set <code>inputstream</code> = <code>inputstream.tempo</code>, <code>inputstream.tempo.tempo</code> = 1.0, a per-session <code>tempo_file</code>, and <code>queue_secs</code> matching the Piers setting. Resume keeps working through <code>setResumePoint</code> — VideoPlayer seeks the demuxer before output starts <span class="cite">VideoPlayer.cpp:1331–1338</span>; do not set <code>start_time</code>, which arms the PAPlayer-specific silence hold.</p>
+  <p>The controller becomes a pulse scheduler rather than the old continuous ladder: a pulse is (r, T) with displacement (r−1)·T, |r−1| ≤ 0.03, T chosen from the measured residual; wait Q + 1 s after the pulse before trusting position; seek when the residual exceeds what a pulse can close in ~10 s (≈300 ms at 3 %), exactly the budget the shakedown computed; on transcodes, pulses are the only fine tool. A one-signed residual across several pulses still means a rate mismatch the actuator cannot reach — keep the shakedown's "stop and tell the user" follow-up.</p>
+</section>
+
+<section class="prose" id="costs">
+  <h2>5. Costs, limits, and where it bites</h2>
+  <ul>
+    <li><span class="pill risk">certain</span><strong>Passthrough.</strong> The add-on decodes audio to PCM f32 whenever it is the inputstream, even at 1.0×. Multichannel PCM over HDMI is fine for most setups; Atmos and DTS:X object metadata is gone, and an AVR that was bitstreaming will mute for a moment at the session start. Switching between passthrough and PCM mid-stream is not an option — a codec change makes Kodi reopen the audio stream, which is far more audible than any nudge. This is a scoping decision: SyncPlay sessions only, and a setting for passthrough households.</li>
+    <li><span class="pill caution">by design</span><strong>Dead time and readout bias</strong> as in §4.5 and §4.3. Both are bounded and both are handled — but only if the controller is designed for them from the start.</li>
+    <li><span class="pill caution">measure</span><strong>Cadence during a nudge.</strong> On a display matched to the content rate, a 1 % pulse drops or repeats one frame every 100 frames (~4 s at 23.976), 3 % every 33 frames. On the rig's 60 Hz panels that hides inside the existing 3:2 cadence; on a 24p-matched HTPC it is the same micro-stutter any rate mismatch produces. Short pulses keep it short.</li>
+    <li><span class="pill caution">measure</span><strong>Frame-rate re-detection.</strong> A held rate triggers a renderer rebuild once it has been stable for the current detection window. The window restarts at 1 s after every seek, so the likeliest trigger is a pulse issued in the seconds after a group seek; a few minutes into steady playback the window is 32–64 s and pulses pass under it. What a rebuild looks like on the MediaCodec surface renderer is the thing to measure (§8); a display-mode switch is not a realistic outcome.</li>
+    <li><span class="pill caution">accept</span><strong>Dolby Vision in MKV on Android</strong> loses its DV signalling (§4.7).</li>
+    <li><span class="pill out">inherited</span><strong>Kodi's own seek quirks</strong> — the post-seek discard, the segment snapping of transcodes — are unchanged by this route.</li>
+    <li><span class="pill out">maintenance</span><strong>Fork distance.</strong> <code>FFmpegStream.cpp</code> differs from upstream ffmpegdirect by ~720 lines already, and the video path means upstream's video fixes now matter (upstream is at 22.2.4 with recent catchup/timeshift fixes, one of them yours). Budget for periodic rebasing.</li>
+    <li><span class="pill good">neutral</span><strong>CPU.</strong> Decoding one audio track and running <code>atempo</code> is a few percent of one ARM core; video is not touched. Worth one reading on the Tab with a 5.1 E-AC-3 track, nothing more.</li>
+  </ul>
+</section>
+
+<section class="prose" id="alternatives">
+  <h2>6. Alternatives considered</h2>
+</section>
+<div class="tbl-wrap wide">
+<table>
+  <thead><tr><th style="width:24%">Option</th><th>Why not, or why not yet</th></tr></thead>
+  <tbody>
+    <tr><td>Kodi's own tempo with the display clock on</td><td>Measured and rejected: the precondition imposes 0.5–4.3 % rate error on the rig, up to 14× the controller's authority, and it is not configurable away on Android (shakedown §10).</td></tr>
+    <tr><td>Patch Kodi to allow tempo without the display clock</td><td>Tempo needs the audio resampled to a clock that is not the audio; that is precisely what display-clock mode is. A new "resample while audio is master" mode is real VideoPlayer work, version-bound, and unavailable to anyone on a release build for a year or more. The inputstream route works on today's 21 and 22.</td></tr>
+    <tr><td>Seek-only (status quo)</td><td>Accurate on direct play, impossible on transcodes, and every correction is a visible cut. It remains the right tool above ~300 ms.</td></tr>
+    <tr><td>inputstream.adaptive</td><td>No rate control, and it does not open plain files or Jellyfin's static streams.</td></tr>
+    <tr><td>Report the stream as realtime to get <code>SYNC_RESAMPLE</code></td><td>Realtime streams are excluded from tempo outright (<code>!realtime</code> in <code>cantempo</code>), and the mode also disables passthrough and seeking. Dead end.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="prose" id="plan">
+  <h2>7. Plan and effort</h2>
+  <p>Three phases, each with something that can be measured before the next starts. Estimates assume one person who knows both code bases.</p>
+</section>
+<div class="phases wide">
+  <div class="phase">
+    <h3>A · Add-on core</h3>
+    <p class="effort">≈ 2 weeks incl. Linux + Android builds</p>
+    <ul>
+      <li>Segment list and <code>M(·)</code>; project video/subtitle <code>pts</code>, <code>dts</code>, <code>duration</code></li>
+      <li>Continuity rule across seek and flush; anchor on the first mapped packet</li>
+      <li><code>IPOSTIME</code> + <code>PosTime</code> with <code>AVSEEK_FLAG_BACKWARD</code>; output-domain <code>startpts</code> on the legacy path too</li>
+      <li><code>ptsStart</code> at <code>head − Q</code>; <code>queue_secs</code> property</li>
+      <li>Audio re-target in <code>OpenStream</code>; all audio streams advertised as PCM</li>
+      <li>Wall-clock poll; per-session file; state write-back; no long sleeps in <code>DemuxRead</code></li>
+      <li>Colour-field mapping; service props for video; disable the silence hold when a real video stream exists</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>B · kofin wiring</h3>
+    <p class="effort">≈ 1 week</p>
+    <ul>
+      <li>Route SyncPlay video items (direct play/stream) through the add-on behind a setting; passthrough guard</li>
+      <li>Per-session tempo file; Piers queue-size set/restore</li>
+      <li>Pulse scheduler with Q-aware measurement windows; seek above the pulse budget; rate-mismatch give-up</li>
+      <li>Log lines for pulse issued / applied / residual, same style as the shakedown's</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>C · Rig measurement</h3>
+    <p class="effort">1–2 days on the three Piers boxes + desktop Omega</p>
+    <ul>
+      <li>§8 checklist, in order; the first two can end the effort early in a useful way</li>
+      <li>Re-use <code>tests/live/syncplay_drift.py</code> and the tempo-gate slope method</li>
+      <li>Photo/beep pair for A/V sync (shakedown §5.4)</li>
+      <li>Write up the arms as the shakedown did; contribute the Kodi-general findings to kodi-drive</li>
+    </ul>
+  </div>
+</div>
+
+<section class="prose" id="verify">
+  <h2>8. What to measure first</h2>
+  <ol>
+    <li><strong>The actuator moves the clock.</strong> A +3 % write must steepen the <code>Player.GetProperties time</code> slope by ≈ +30 000 ppm on each box, the way Gate 0 proved <code>SetTempo</code> did — and this time with the display clock <em>off</em>.</li>
+    <li><strong>A/V stays locked.</strong> Photo the frame counter and record the beep on two members during and after a 3 % pulse; target ≤ 1 frame. This is the claim the whole design rests on.</li>
+    <li><strong>Readout bias</strong> with and without the <code>head − Q</code> correction, against the external sampler.</li>
+    <li><strong>Renderer rebuild visibility</strong> on the Bravia, Pixel and Tab: a 20 s 3 % hold issued 2 s after a seek, then again after 3 minutes of steady play. Look for the <code>CRenderManager::Configure - change configuration</code> log line and whatever the screen does.</li>
+    <li><strong>Seek landing</strong> through the add-on versus the internal demuxer on direct play, using <code>_seek_and_settle</code>'s own tolerance.</li>
+    <li><strong>Mid-play audio-track switch</strong> — sync afterwards, and the OSD's codec label.</li>
+    <li><strong>Dead time</strong> per configuration (Omega 8 s; Piers 4 s and 1 s) from file write to slope change.</li>
+    <li><strong>HDR10 on the Bravia</strong> with the colour fields mapped; then a DV MKV to confirm the fallback is as described.</li>
+    <li><strong>HLS transcode</strong> start-up, reported duration and position pulses — the gate for phase 2.</li>
+    <li><strong>Open questions</strong> to settle along the way: whether changing <code>videoplayer.queuetimesize</code> needs a player stop before it applies; whether Omega is worth more than "best effort" given every rig member runs Piers; and the DV-profile-5 policy.</li>
+  </ol>
+</section>
+
+<hr class="end">
+<section class="prose sources" id="sources">
+  <h2 style="font-size:1.15rem;margin-top:0">9. Sources</h2>
+  <p><strong>This add-on</strong> (<code>src/stream/FFmpegStream.cpp</code> unless noted): capabilities 225–235 · <code>EnableStream</code>/<code>OpenStream</code> 268–275 · <code>DemuxFlush</code> 294–328 · <code>DemuxRead</code> 359–648 (tempo poll ≈378, non-tempo branch ≈530–562) · <code>GetTotalTime</code>/<code>GetTime</code>/<code>GetTimes</code> 696–744 · <code>SeekTime</code> 1564–1725 · <code>AddStream</code> 2105–2460 · tempo pipeline 2812–3224 · <code>DemuxStream.cpp</code> 99–160 · <code>resources/lib/runner.py</code>, <code>speed.py</code> · <code>StreamManager.cpp</code> property parsing.</p>
+  <p><strong>Kodi 21</strong> (<code>xbmc/cores/VideoPlayer/</code>): <code>VideoPlayer.cpp</code> 1331–1338, 1432, 1452–1463, 2202, 2212–2254, 2692–2730, 3542–3600, 3931, 4858–4925, <code>HandlePlaySpeed</code>, <code>CheckContinuity</code> · <code>VideoPlayerAudio.cpp</code> 66, 133–138, 653–655 · <code>VideoPlayerVideo.cpp</code> 72, 474, 856–870, 1006–1080 · <code>VideoRenderers/RenderManager.cpp</code> 81–95, 157–171, 879–897 · <code>DVDMessageQueue.cpp</code> 310–330 · <code>DVDDemuxers/DVDDemuxClient.cpp</code> 312–373, 696–745 · <code>DVDDemuxers/DVDDemuxFFmpeg.cpp</code> <code>SeekTime</code> · <code>DVDInputStreams/InputStreamAddon.cpp</code> 264–330, 437–480, 560–600 · <code>DVDInputStreams/DVDInputStream.h</code> 187 · <code>DVDCodecs/Video/DVDVideoCodecAndroidMediaCodec.cpp</code> 518–545 · <code>xbmc/windowing/Resolution.cpp</code> <code>ChooseBestResolution</code>, <code>FindResolutionFromWhitelist</code>.</p>
+  <p><strong>Kodi 22</strong>: <code>VideoPlayer.cpp</code> 775–777, 3003–3042, 5573–5674, 5765 · <code>VideoPlayerAudio.cpp</code> 133–138 · <code>system/settings/settings.xml</code> 956 · <code>xbmc/settings/PlayerSettings.cpp</code> <code>SettingOptionsQueueTimeSizesFiller</code>.</p>
+  <p><strong>kofin</strong>: <code>lib/kofin/syncplay/playback.py</code> · <code>lib/kofin/syncplay/utils.py</code> · <code>lib/kofin/plugin/play.py</code> 80–130, 600–640 · <code>lib/kofin/plugin/listitems.py</code> 315–332 · <code>docs/syncplay-drift-shakedown.md</code> §1–§3, §10. <strong>koshelf</strong>: <code>main.py</code> 1051–1255 for the existing property contract. <strong>Upstream</strong>: <code>ref/inputstream.ffmpegdirect</code> at 22.2.4 for the diff.</p>
+</section>
+</div>
