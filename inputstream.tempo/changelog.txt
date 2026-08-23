@@ -1,3 +1,11 @@
+v22.4.1
+- Seeks no longer lose the first packets of the new position. SeekTime's
+  probe for where the seek landed read them and freed them, so every decoder
+  started mid-GOP after a seek: "[hevc] Could not find ref with POC" bursts on
+  software decode, concealed on most hardware decoders, and a wedged AV1
+  decoder on a Pixel 7 (inherited from upstream ffmpegdirect; Kodi's own
+  demuxer keeps its probe packet). They are now queued and delivered first.
+
 v22.4.0
 - Tempo now covers video. Video and subtitle packets are projected through the
   same content↔output time map (src/stream/TempoMap.h) that the stretched

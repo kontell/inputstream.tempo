@@ -580,6 +580,15 @@ bool FFmpegStream::CheckAndUpdateInitialSeekHold()
 
 DEMUX_PACKET* FFmpegStream::DemuxRead()
 {
+  // Whatever SeekTime's probe already read after a seek goes out first:
+  // stream ids resolved and timestamps projected when they were read.
+  if (!m_pendingPackets.empty())
+  {
+    DEMUX_PACKET* pending = m_pendingPackets.front();
+    m_pendingPackets.pop();
+    return pending;
+  }
+
   // Return buffered tempo-processed packets first
   if (m_tempoEnabled && !m_tempoOutputQueue.empty())
   {
@@ -1063,6 +1072,11 @@ bool FFmpegStream::IsRealTimeStream()
 
 void FFmpegStream::Dispose()
 {
+  while (!m_pendingPackets.empty())
+  {
+    m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_pendingPackets.front());
+    m_pendingPackets.pop();
+  }
   DestroyTempoProcessing();
 
   m_pkt.result = -1;
@@ -1974,7 +1988,7 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
           std::this_thread::sleep_for(std::chrono::milliseconds(10));
           continue;
         }
-        m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(pkt);
+        m_pendingPackets.push(pkt); // the new position's first packets: delivered next
       }
     }
   }

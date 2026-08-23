@@ -236,6 +236,15 @@ private:
   AVFrame* m_filteredFrame = nullptr;
 
   std::queue<DEMUX_PACKET*> m_tempoOutputQueue;
+  // Packets SeekTime's pts probe has already read after a seek. They are the
+  // first packets of the new position — the keyframe among them — and they
+  // are delivered by DemuxRead before anything else is read, exactly as
+  // Kodi's own demuxer keeps its probe packet (ReadInternal(keep=true)).
+  // Freeing them, as upstream ffmpegdirect does, starts every decoder mid-GOP
+  // after a seek: [hevc] "Could not find ref with POC" on software decode,
+  // concealed by most hardware decoders, and a wedged AV1 decoder on a
+  // Pixel 7. Survives DemuxFlush, which Kodi calls right after PosTime.
+  std::queue<DEMUX_PACKET*> m_pendingPackets;
   // Output PTS (wall-clock rate) — used for packet.pts/dts so ActiveAE
   // schedules audio correctly. Advances by outputDuration per packet.
   double m_tempoOutputPts = 0.0;
