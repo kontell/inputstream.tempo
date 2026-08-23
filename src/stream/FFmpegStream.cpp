@@ -581,14 +581,36 @@ bool FFmpegStream::CheckAndUpdateInitialSeekHold()
 DEMUX_PACKET* FFmpegStream::DemuxRead()
 {
   // Whatever SeekTime's probe already read after a seek goes out first:
-  // stream ids resolved and timestamps projected when they were read.
+  // stream ids resolved and timestamps projected when they were read, and
+  // the content position they set restored, because the flush in between
+  // cleared it.
   if (!m_pendingPackets.empty())
   {
-    DEMUX_PACKET* pending = m_pendingPackets.front();
+    const auto pending = m_pendingPackets.front();
     m_pendingPackets.pop();
-    return pending;
+    if (pending.second != STREAM_NOPTS_VALUE &&
+        (pending.second > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE))
+    {
+      m_currentPts = pending.second;
+      CurrentPTSUpdated();
+    }
+    return pending.first;
   }
 
+  return ReadNew();
+}
+
+void FFmpegStream::FreePendingPackets()
+{
+  while (!m_pendingPackets.empty())
+  {
+    m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_pendingPackets.front().first);
+    m_pendingPackets.pop();
+  }
+}
+
+DEMUX_PACKET* FFmpegStream::ReadNew()
+{
   // Return buffered tempo-processed packets first
   if (m_tempoEnabled && !m_tempoOutputQueue.empty())
   {
@@ -1072,11 +1094,7 @@ bool FFmpegStream::IsRealTimeStream()
 
 void FFmpegStream::Dispose()
 {
-  while (!m_pendingPackets.empty())
-  {
-    m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_pendingPackets.front());
-    m_pendingPackets.pop();
-  }
+  FreePendingPackets();
   DestroyTempoProcessing();
 
   m_pkt.result = -1;
@@ -1976,19 +1994,25 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
   if (ret >= 0)
   {
     {
+      // A second seek before Kodi drained the last one's probe packets: they
+      // are the old position's, and must not be handed to this probe.
+      FreePendingPackets();
+
       kodi::tools::CEndTime timer(1000);
       while (m_currentPts == STREAM_NOPTS_VALUE && !timer.IsTimePast())
       {
         m_pkt.result = -1;
         av_packet_unref(&m_pkt.pkt);
 
-        DEMUX_PACKET* pkt = DemuxRead();
+        // Through ReadNew, never DemuxRead: the latter would return what
+        // this loop just queued, and spin on it if it carried no timestamp.
+        DEMUX_PACKET* pkt = ReadNew();
         if (!pkt)
         {
           std::this_thread::sleep_for(std::chrono::milliseconds(10));
           continue;
         }
-        m_pendingPackets.push(pkt); // the new position's first packets: delivered next
+        m_pendingPackets.push({pkt, m_currentPts}); // the new position's first packets: delivered next
       }
     }
   }
