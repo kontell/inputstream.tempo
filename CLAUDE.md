@@ -74,6 +74,12 @@ If `BuildFilterGraph` fails, `InitTempoProcessing` clears `m_tempoEnabled` and
 `m_tempoAudioStreamIndex` so the dispatcher routes packets through the passthrough
 branch rather than dereferencing a freed decoder context.
 
+**Seek probe keeps its packets.** `SeekTime` reads packets after `av_seek_frame`
+to learn where it landed; they go to `m_pendingPackets` and `DemuxRead` returns
+them first (upstream frees them, so every decoder started mid-GOP after a seek —
+HEVC logged it, a Pixel 7's AV1 decoder wedged on it). `DemuxFlush`, which Kodi
+calls right after `PosTime`, must leave that queue alone; `Dispose` frees it.
+
 **Rebuild policy:** `SeekTime` rebuilds the graph only when
 `m_tempoEmittedPackets < 10`. Startup-window seeks reset the filter cleanly;
 mid-stream seeks keep the warm filter. The v0.3.7 unconditional rebuild caused an
