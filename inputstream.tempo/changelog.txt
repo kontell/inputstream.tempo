@@ -1,3 +1,14 @@
+v21.4.2
+- Playback-speed keys (PgUp/PgDn) and the speed dialog work again for add-ons
+  that keep their rate in a file of their own. speed.py read the shared
+  special://temp/inputstream_tempo regardless of what the sentinel named, so a
+  key press wrote a new rate into a file nothing was polling: the script ran,
+  Kodi logged it as successful, and the stream carried on at the old speed. It
+  now takes tempo_file and config_file from the sentinel, falling back to the
+  shared paths when the sentinel does not name them.
+- A sentinel left behind by a previous run is cleared at startup, so the keys
+  are not live for playback that has nothing to do with tempo.
+
 v21.4.1
 - Seeks no longer lose the first packets of the new position. SeekTime's
   probe for where the seek landed read them and freed them, so every decoder

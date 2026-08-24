@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="21.4.1"
+  version="21.4.2"
   name="Inputstream Tempo"
   provider-name="kontell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with tempo control (pitch-corrected playback speed) for audio and video</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts, and rate-shifts video and subtitles in step with the audio so the same control works for video. Based on inputstream.ffmpegdirect.</description>
-    <news>v21.4.1 Seeks keep the first packets of the new position: the probe for where a seek landed used to read and free them, so decoders started mid-GOP after every seek (HEVC logged it, a Pixel 7 AV1 decoder wedged on it). v21.4.0 Tempo now covers video: video and subtitle packets are projected through the same content/output time map as the stretched audio, so a video item plays in sync at any rate. Seeks, the OSD and external subtitles follow the map (IPOSTIME is advertised for video items); the audio pipeline follows Kodi's audio-track selection; time is reported at the playing point given the queue depth (queue_secs); tempo changes are polled by wall clock and written back to tempo_file.state; HDR colour metadata is now passed through.</news>
+    <news>v21.4.2 The playback-speed keys work again for add-ons that keep their rate in a file of their own. speed.py read the shared special://temp/inputstream_tempo regardless of what the sentinel named, so PgUp/PgDn wrote a rate nothing was polling and the stream carried on unchanged. It now takes tempo_file and config_file from the sentinel. A sentinel left behind by a previous run is also cleared at startup. v21.4.1 Seeks keep the first packets of the new position: the probe for where a seek landed used to read and free them, so decoders started mid-GOP after every seek (HEVC logged it, a Pixel 7 AV1 decoder wedged on it). v21.4.0 Tempo now covers video: video and subtitle packets are projected through the same content/output time map as the stretched audio, so a video item plays in sync at any rate. Seeks, the OSD and external subtitles follow the map (IPOSTIME is advertised for video items); the audio pipeline follows Kodi's audio-track selection; time is reported at the playing point given the queue depth (queue_secs); tempo changes are polled by wall clock and written back to tempo_file.state; HDR colour metadata is now passed through.</news>
   </extension>
 </addon>
