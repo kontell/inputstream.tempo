@@ -10,22 +10,13 @@ Rates from **0.5× to 100×**; live changes land within a few hundred millisecon
 
 ## Who uses it
 
-- **[KoShelf](https://github.com/kontell/KoShelf)** — audiobooks and podcasts from Audiobookshelf, with a speed dialog and keyboard shortcuts.
+- **[Kotome](https://github.com/kontell/plugin.audio.kotome)** — audiobooks and podcasts from Audiobookshelf, with a speed dialog and keyboard shortcuts.
 - **[Kofin](https://github.com/kontell/plugin.video.kofin)** — SyncPlay *fine sync*: while watching in a Jellyfin group, a member that has slipped from the group plays a few percent faster or slower for a few seconds instead of skipping. Kofin recommends this add-on as an optional dependency and needs **21.4.1 / 22.4.1 or later**.
 - A [patched YouTube add-on](https://github.com/anxdpanic/plugin.video.youtube/compare/master...kontell:plugin.video.youtube:tempo) showed it works for that add-on's audio & video playback too.
 
-## Installing
+## Installation
 
-Zips are on the [releases page](https://github.com/kontell/inputstream.tempo/releases). Pick the one for your Kodi and platform and install it from *Add-ons → Install from zip file*.
-
-| Kodi | Channel | Version |
-| --- | --- | --- |
-| 22 "Piers" | `Piers` branch, tags `v22.*` | `22.y.z` |
-| 21 "Omega" | `Omega` branch, tags `v21.*` | `21.y.z` |
-
-The major version is the Kodi version; the rest moves in step across both channels. Platforms: Linux (x86_64, aarch64, armv7), Android (aarch64, armv7) and Windows (x86_64).
-
-The Linux zips carry their own libstdc++, so they run on any distribution's Kodi, the flatpak included.
+Install via the Kontell repository: [`repository.kontell`](https://github.com/kontell/repository.kontell).
 
 ## Using it from an add-on
 
