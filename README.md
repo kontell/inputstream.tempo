@@ -12,7 +12,7 @@ Rates from **0.5× to 100×**; live changes land within a few hundred millisecon
 
 - **[KoShelf](https://github.com/kontell/KoShelf)** — audiobooks and podcasts from Audiobookshelf, with a speed dialog and keyboard shortcuts.
 - **[Kofin](https://github.com/kontell/plugin.video.kofin)** — SyncPlay *fine sync*: while watching in a Jellyfin group, a member that has slipped from the group plays a few percent faster or slower for a few seconds instead of skipping. Kofin recommends this add-on as an optional dependency and needs **21.4.1 / 22.4.1 or later**.
-- A [patched YouTube add-on](https://github.com/anxdpanic/plugin.video.youtube/compare/master...kontell:plugin.video.youtube:tempo) showed it works for that add-on's audio-only playback too.
+- A [patched YouTube add-on](https://github.com/anxdpanic/plugin.video.youtube/compare/master...kontell:plugin.video.youtube:tempo) showed it works for that add-on's audio & video playback too.
 
 ## Installing
 
