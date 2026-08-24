@@ -47,6 +47,23 @@ def install_keymap():
     xbmc.log('inputstream.tempo: installed keymap to {}'.format(KEYMAP_DST), xbmc.LOGINFO)
 
 
+def clear_stale_sentinel():
+    """Drop a sentinel left over from a previous run.
+
+    Nothing is playing when the service starts, so anything still on disk is
+    from a Kodi that did not shut down cleanly. It matters because a caller
+    only removes a sentinel it can tell is its own: one in the old bare-id
+    format names no add-on, so otherwise nobody would ever clear it and the
+    speed keys would stay live over unrelated playback.
+    """
+    if xbmc.Player().isPlaying():
+        return
+    try:
+        os.remove(ACTIVE_FILE)
+    except OSError:
+        pass
+
+
 def resolve_tempo_file():
     """The rate file the playing addon is using, per the sentinel.
 
@@ -95,6 +112,7 @@ def cleanup_timeshift():
 def run():
     install_keymap()
     cleanup_timeshift()
+    clear_stale_sentinel()
 
     monitor = xbmc.Monitor()
     player = xbmc.Player()
