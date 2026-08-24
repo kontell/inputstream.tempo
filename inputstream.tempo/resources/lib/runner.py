@@ -15,6 +15,7 @@ import xbmcgui
 import xbmcvfs
 
 ADDON = xbmcaddon.Addon()
+# Legacy shared path, used when the sentinel does not name one of its own.
 TEMPO_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo')
 NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
 ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
@@ -46,10 +47,46 @@ def install_keymap():
     xbmc.log('inputstream.tempo: installed keymap to {}'.format(KEYMAP_DST), xbmc.LOGINFO)
 
 
-def read_tempo():
+def clear_stale_sentinel():
+    """Drop a sentinel left over from a previous run.
+
+    Nothing is playing when the service starts, so anything still on disk is
+    from a Kodi that did not shut down cleanly. It matters because a caller
+    only removes a sentinel it can tell is its own: one in the old bare-id
+    format names no add-on, so otherwise nobody would ever clear it and the
+    speed keys would stay live over unrelated playback.
+    """
+    if xbmc.Player().isPlaying():
+        return
+    try:
+        os.remove(ACTIVE_FILE)
+    except OSError:
+        pass
+
+
+def resolve_tempo_file():
+    """The rate file the playing addon is using, per the sentinel.
+
+    speed.py resolves it the same way; see its resolve_files(). An addon
+    that names no file of its own still gets the shared one.
+    """
+    try:
+        with open(ACTIVE_FILE) as f:
+            content = f.read()
+    except (IOError, OSError):
+        return TEMPO_FILE
+
+    for line in content.splitlines():
+        key, sep, value = line.partition('=')
+        if sep and key.strip() == 'tempo_file' and value.strip():
+            return value.strip()
+    return TEMPO_FILE
+
+
+def read_tempo(tempo_file=TEMPO_FILE):
     """Read current tempo from the IPC file."""
     try:
-        with open(TEMPO_FILE) as f:
+        with open(tempo_file) as f:
             return float(f.read().strip())
     except Exception:
         return 1.0
@@ -75,6 +112,7 @@ def cleanup_timeshift():
 def run():
     install_keymap()
     cleanup_timeshift()
+    clear_stale_sentinel()
 
     monitor = xbmc.Monitor()
     player = xbmc.Player()
@@ -111,7 +149,7 @@ def run():
             ACTIVE_FILE
         )
         if active:
-            tempo = read_tempo()
+            tempo = read_tempo(resolve_tempo_file())
             win.setProperty('InputstreamTempo.Speed', str(tempo))
             win.setProperty('InputstreamTempo.SpeedDisplay', '{:.2f}x'.format(tempo))
             win.setProperty('InputstreamTempo.Active', 'true')

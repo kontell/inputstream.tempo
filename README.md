@@ -54,7 +54,19 @@ Resume for video goes through Kodi's normal `setResumePoint` path unchanged. HLS
 
 ## Keyboard control
 
-`resources/keymap.xml` binds **Page Up / Page Down** (one step faster/slower), **=** (back to 1.0×) and **S** (a picker dialog) while the add-on is active. The step and range come from `special://temp/inputstream_tempo_config` (`{"step", "min", "max"}`) and the keys act only while `special://temp/inputstream_tempo_active` exists — KoShelf writes both; a SyncPlay session never does, so the keys cannot change a group member's speed.
+`resources/keymap.xml` binds **Page Up / Page Down** (one step faster/slower), **=** (back to 1.0×) and **S** (a picker dialog) while the add-on is active. The keys act only while the sentinel `special://temp/inputstream_tempo_active` exists — KoShelf writes it; a SyncPlay session never does, so the keys cannot change a group member's speed.
+
+The sentinel also says which files the keys should act on, so that two add-ons using tempo do not write over each other's rate. Write `key=value` lines:
+
+```
+addon=plugin.video.youtube
+tempo_file=/…/temp/inputstream_tempo.plugin.video.youtube
+config_file=/…/temp/inputstream_tempo_config.plugin.video.youtube
+```
+
+`config_file` holds the step and range as `{"step", "min", "max"}`. Content that names no `tempo_file` — including anything written before this contract existed — falls back to the shared `special://temp/inputstream_tempo` and `…_config`, so an add-on that has not moved to its own files keeps working unchanged.
+
+**Remove the sentinel only if it is yours.** Kodi's player callbacks fire for everything played on the box, not only your own items, so an add-on that removes it unconditionally when playback ends takes the keys away from whatever else armed them.
 
 ## Status and limitations
 
