@@ -944,6 +944,54 @@ DEMUX_PACKET* FFmpegStream::ReadNew()
 
 bool FFmpegStream::DemuxSeekTime(double time, bool backwards, double& startpts)
 {
+  // Undo the offset Kodi has already applied to this target — on this path
+  // only, which is the one path where it applied one.
+  //
+  // VideoPlayer.cpp does, right before seeking the demuxer:
+  //
+  //     if (m_pInputStream->GetIPosTime() == nullptr)
+  //       time -= m_State.time_offset / 1000l;
+  //
+  // and time_offset is -ptsStart, which GetTimes() sets to -Δ so the OSD
+  // reads content time. So the value arriving here has had Δ taken off it:
+  // it is an OUTPUT-domain time, while av_seek_frame indexes the container
+  // in CONTENT time. Seeking straight to it lands Δ short of where the user
+  // asked, every time.
+  //
+  // That subtraction is also what makes this path, and only this path, output
+  // time: CInputStreamAddon::SeekTime calls PosTime() instead whenever
+  // IPOSTIME is advertised, which is exactly when Kodi skips the subtraction.
+  // So PosTime() and SeekChapter() both already hold content time. Converting
+  // in SeekTime(), which all three share, simply moved the error onto them —
+  // measured on 21.3: a chapter jump landed Δ past the start of the chapter
+  // (139s at Δ=139s) and a video seek Δ past its target (42s at Δ=44s), while
+  // in both cases the *output* time landed dead on. Keep the conversion at the
+  // entry point that needs it.
+  //
+  // Δ is invisible on a big skip and ruinous on a small one. It grows with
+  // playback whenever the rate is above 1 (content outruns output), so ten
+  // minutes into a book at 1.5x a 10-second step goes *backwards*, while the
+  // 600-second step is only out by a few percent. Measured on 21.3 at Δ≈68s:
+  // every seek, forwards or backwards, large or small, landed 64-69s short.
+  //
+  // Add back the Δ we last reported rather than re-reading the map:
+  // CurrentDelta() prefers exactly the value Kodi subtracted, so the two
+  // cancel. Re-deriving it here would reintroduce the drift between the
+  // reported and current Δ that this is correcting.
+  //
+  // Kodi's own comment on that subtraction says the result "may point to
+  // nirvana", which is a fair description of where a small skip ends up.
+  if (m_tempoEnabled)
+  {
+    const double deltaMs = CurrentDelta() * 1000.0 / STREAM_TIME_BASE;
+    if (deltaMs != 0.0)
+    {
+      Log(LOGLEVEL_DEBUG, "Tempo: seek target %.3fs is output-domain; +Δ %.3fs -> content %.3fs",
+          time / 1000.0, deltaMs / 1000.0, (time + deltaMs) / 1000.0);
+      time += deltaMs;
+    }
+  }
+
   return SeekTime(time, backwards, &startpts);
 }
 
@@ -1052,6 +1100,10 @@ bool FFmpegStream::PosTime(int ms)
   // target ourselves — otherwise video starts a GOP late. (SeekTime takes
   // milliseconds; the inherited version scaled to seconds and was never
   // exercised because the flag was not advertised.)
+  //
+  // `ms` is already CONTENT time: advertising IPOSTIME is what stops
+  // VideoPlayer subtracting time_offset, so there is nothing to undo here.
+  // DemuxSeekTime carries that reasoning in full.
   return SeekTime(static_cast<double>(ms), true);
 }
 
@@ -1869,49 +1921,15 @@ void FFmpegStream::StoreSideData(DEMUX_PACKET *pkt, AVPacket *src)
   }
 }
 
+// `time` is CONTENT time, the domain av_seek_frame indexes the container in.
+// Every caller is responsible for arriving in it: PosTime() and SeekChapter()
+// already hold content time, and DemuxSeekTime() converts. See DemuxSeekTime.
 bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
 {
   bool hitEnd = false;
 
   if (!StreamsOpened())
     return false;
-
-  // Undo the offset Kodi has already applied to this target.
-  //
-  // VideoPlayer.cpp does, right before calling us:
-  //
-  //     if (m_pInputStream->GetIPosTime() == nullptr)
-  //       time -= m_State.time_offset / 1000l;
-  //
-  // and time_offset is -ptsStart, which GetTimes() sets to -Δ so the OSD
-  // reads content time. So the value arriving here has had Δ taken off it:
-  // it is an OUTPUT-domain time, while av_seek_frame indexes the container
-  // in CONTENT time. Seeking straight to it lands Δ short of where the user
-  // asked, every time.
-  //
-  // That is invisible on a big skip and ruinous on a small one. Δ grows with
-  // playback whenever the rate is above 1 (content outruns output), so ten
-  // minutes into a book at 1.5x a 10-second step goes *backwards*, while the
-  // 600-second step is only out by a few percent. Measured on 21.3 at Δ≈68s:
-  // every seek, forwards or backwards, large or small, landed 64-69s short.
-  //
-  // Add back the Δ we last reported rather than re-reading the map:
-  // CurrentDelta() prefers exactly the value Kodi subtracted, so the two
-  // cancel. Re-deriving it here would reintroduce the drift between the
-  // reported and current Δ that this is correcting.
-  //
-  // Kodi's own comment on that subtraction says the result "may point to
-  // nirvana", which is a fair description of where a small skip ends up.
-  if (m_tempoEnabled)
-  {
-    const double deltaMs = CurrentDelta() * 1000.0 / STREAM_TIME_BASE;
-    if (deltaMs != 0.0)
-    {
-      Log(LOGLEVEL_DEBUG, "Tempo: seek target %.3fs is output-domain; +Δ %.3fs -> content %.3fs",
-          time / 1000.0, deltaMs / 1000.0, (time + deltaMs) / 1000.0);
-      time += deltaMs;
-    }
-  }
 
   if (time < 0)
   {
@@ -3087,6 +3105,7 @@ bool FFmpegStream::SeekChapter(int chapter)
 
   AVChapter* ch = m_pFormatContext->chapters[chapter - 1];
   double dts = ConvertTimestamp(ch->start, ch->time_base.den, ch->time_base.num);
+  // Container timestamps, so CONTENT time already — no time_offset to undo.
   return SeekTime(STREAM_TIME_TO_MSEC(dts), true);
 }
 
