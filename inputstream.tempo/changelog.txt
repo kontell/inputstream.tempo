@@ -1,3 +1,14 @@
+v22.4.3
+- Chapter jumps and video seeks land where you asked again. 22.4.2 fixed
+  seeking by undoing the time_offset Kodi applies to a seek target, but did
+  it in the one function all three seek entry points share — and only one of
+  them arrives with that offset applied. Kodi skips the subtraction whenever
+  IPOSTIME is advertised, calling PosTime() instead of the demuxer seek, so
+  video seeks and chapter jumps already held content time and were shifted
+  by Δ instead of corrected. Measured on 21.3: a chapter jump landed 139s
+  past the start of the chapter at Δ=139s, and a video seek 42s past its
+  target at Δ=44s. Audio seeking, which 22.4.2 fixed, is unchanged.
+
 v22.4.2
 - Skipping works again. Every seek landed short by Δ (content − output time),
   because Kodi subtracts its time_offset from the target before handing it
