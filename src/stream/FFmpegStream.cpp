@@ -1104,6 +1104,7 @@ bool FFmpegStream::PosTime(int ms)
   // `ms` is already CONTENT time: advertising IPOSTIME is what stops
   // VideoPlayer subtracting time_offset, so there is nothing to undo here.
   // DemuxSeekTime carries that reasoning in full.
+  Log(LOGLEVEL_DEBUG, "Tempo: PosTime(%.3fs) is content-domain", ms / 1000.0);
   return SeekTime(static_cast<double>(ms), true);
 }
 
@@ -3106,6 +3107,8 @@ bool FFmpegStream::SeekChapter(int chapter)
   AVChapter* ch = m_pFormatContext->chapters[chapter - 1];
   double dts = ConvertTimestamp(ch->start, ch->time_base.den, ch->time_base.num);
   // Container timestamps, so CONTENT time already — no time_offset to undo.
+  Log(LOGLEVEL_DEBUG, "Tempo: SeekChapter(%d) -> content %.3fs", chapter,
+      STREAM_TIME_TO_MSEC(dts) / 1000.0);
   return SeekTime(STREAM_TIME_TO_MSEC(dts), true);
 }
 
