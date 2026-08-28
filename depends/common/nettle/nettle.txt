@@ -1,1 +1,1 @@
-nettle https://ftpmirror.gnu.org/gnu/nettle/nettle-3.9.1.tar.gz
+nettle https://mirrors.kodi.tv/build-deps/sources/nettle-3.10.2.tar.gz
