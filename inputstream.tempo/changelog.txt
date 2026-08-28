@@ -1,264 +1,110 @@
+v21.4.4
+- Tempo works on streams whose audio format is not in the container header
+- Clearer log when the audio format is still unknown at pipeline build
+
 v21.4.3
-- Chapter jumps and video seeks land where you asked again. 21.4.2 fixed
-  seeking by undoing the time_offset Kodi applies to a seek target, but did
-  it in the one function all three seek entry points share — and only one of
-  them arrives with that offset applied. Kodi skips the subtraction whenever
-  IPOSTIME is advertised, calling PosTime() instead of the demuxer seek, so
-  video seeks and chapter jumps already held content time and were shifted
-  by Δ instead of corrected. Measured on 21.3: a chapter jump landed 139s
-  past the start of the chapter at Δ=139s, and a video seek 42s past its
-  target at Δ=44s. Audio seeking, which 21.4.2 fixed, is unchanged.
+- Chapter jumps and video seeks land on target
 
 v21.4.2
-- Skipping works again. Every seek landed short by Δ (content − output time),
-  because Kodi subtracts its time_offset from the target before handing it
-  over — VideoPlayer.cpp: `if (m_pInputStream->GetIPosTime() == nullptr)
-  time -= m_State.time_offset / 1000l` — and time_offset is -ptsStart, which
-  this add-on sets to -Δ so the OSD reads content time. The arriving value is
-  therefore an output-domain time while the container is indexed in content
-  time, and the conversion was never undone.
-  Δ grows with playback whenever the rate is above 1, so the error grew as
-  you listened: a 600-second step was a few percent out, while a 10-second
-  step was swamped and went *backwards*. Measured on 21.3 at Δ≈68s, every
-  seek — forwards or backwards, large or small — landed 64-69s short.
-- Playback-speed keys (PgUp/PgDn) and the speed dialog work again for add-ons
-  that keep their rate in a file of their own. speed.py read the shared
-  special://temp/inputstream_tempo regardless of what the sentinel named, so a
-  key press wrote a new rate into a file nothing was polling: the script ran,
-  Kodi logged it as successful, and the stream carried on at the old speed. It
-  now takes tempo_file and config_file from the sentinel, falling back to the
-  shared paths when the sentinel does not name them.
-- A sentinel left behind by a previous run is cleared at startup, so the keys
-  are not live for playback that has nothing to do with tempo.
+- Seeks land on target; they were short by the tempo offset
+- Speed keys work for add-ons that keep their rate in a file of their own
+- A sentinel left by a previous run is cleared at startup
 
 v21.4.1
-- Seeks no longer lose the first packets of the new position. SeekTime's
-  probe for where the seek landed read them and freed them, so every decoder
-  started mid-GOP after a seek: "[hevc] Could not find ref with POC" bursts on
-  software decode, concealed on most hardware decoders, and a wedged AV1
-  decoder on a Pixel 7 (inherited from upstream ffmpegdirect; Kodi's own
-  demuxer keeps its probe packet). They are now queued and delivered first.
+- Seeks keep the first packets of the new position
 
 v21.4.0
-- Tempo now covers video. Video and subtitle packets are projected through the
-  same content↔output time map (src/stream/TempoMap.h) that the stretched
-  audio walks, so a video item stays in A/V sync at any rate. The data is
-  untouched; only timestamps move.
-- The map's offset (content − output) is continuous across seeks and flushes,
-  so Kodi's own accurate-seek arithmetic (startpts = target − time_offset)
-  and the OSD stay right; SeekTime returns startpts in the packets' domain.
-- INPUTSTREAM_SUPPORTS_IPOSTIME is advertised for video items, so VideoPlayer
-  hands seek targets over in content time instead of shifting them by
-  time_offset. PosTime seeks backward to the keyframe (Kodi drops its
-  backward flag on that path) and now passes milliseconds, not seconds.
-- Time is reported at the playing point: GetTimes() reads the map
-  queue_secs behind the demux head (new property inputstream.tempo.queue_secs;
-  8 on Omega, pass Kodi 22's videoplayer.queuetimesize on Piers), so a
-  running tempo change no longer biases the reported position by
-  (rate − 1) × queue depth. Audio-only items keep the old head reading.
-- The audio pipeline follows Kodi's audio-track selection: every audio
-  stream is advertised as PCM f32 and OpenStream re-targets the decoder and
-  atempo graph to the track Kodi opens; the other tracks are discarded at the
-  demuxer.
-- The audio counters anchor on the first decoded frame's own timestamp
-  rather than the packet dts, so codec priming (AAC, MP3) no longer makes the
-  PCM lead the picture by ~40 ms.
-- The tempo file is polled by wall clock (250 ms) instead of every 50 reads,
-  and each applied change, anchor and re-target is written back atomically to
-  <tempo_file>.state as a one-line JSON record.
-- The wall-clock throttle no longer sleeps inside DemuxRead for video items
-  (that is VideoPlayer's own loop); Kodi's queues pace video. The optional
-  inputstream.tempo.lead_secs property re-enables a lead bound for video,
-  implemented as empty packets with a 10 ms nap.
-- The initial seek hold (start_time) is not armed for video items —
-  VideoPlayer seeks before output starts, so it would only delay the picture.
-- Video stream info now carries colour space, range, primaries and transfer
-  characteristics (HDR10 signalling); upstream reports them unspecified.
-- Service window properties now also update while video is playing.
-- New: tests/tempomap_test.cpp, a dependency-free check of the map.
-- Fix a crash on the first tempo-file poll inside the flatpak Kodi (and any
-  Kodi whose libstdc++ differs from the build host's): the Linux build links
-  libstdc++ statically but exported its symbols, so std::ifstream bound across
-  two libstdc++ copies and jumped into typeinfo. The tempo and state files now
-  go through C stdio, and the Linux link hides the static runtime
-  (-Wl,--exclude-libs,ALL). Present since the first Linux release.
-- New: tests/live/tempo_checklist.py, the JSON-RPC driver for the video
-  checklist (rate slope, dead time, readout step, seeks, audio-track switch,
-  renderer rebuilds), local or over adb.
+- Tempo covers video: video and subtitles follow the audio's time map
+- The time offset stays continuous across seeks and flushes
+- IPOSTIME advertised for video, so seek targets arrive in content time
+- Position reported at the playing point (new queue_secs property)
+- Audio pipeline follows Kodi's audio-track selection
+- Audio anchors on the first decoded frame, dropping ~40 ms of priming
+- Tempo file polled every 250 ms; changes written to <tempo_file>.state
+- No demux sleep for video; optional lead_secs re-enables a lead bound
+- Initial seek hold not armed for video items
+- HDR colour metadata passed through
+- Service window properties update during video
+- Fix a crash on the first tempo-file poll under the flatpak Kodi
+- New: tests/tempomap_test.cpp and tests/live/tempo_checklist.py
 
 v21.3.11
-- Renumbered to Kodi's add-on versioning: the first number is now the Kodi version a build is for, so 22.x.y is Kodi 22 (Piers) and 21.x.y is Kodi 21 (Omega). The add-on itself is unchanged from v0.3.11 — only the numbering and the build system moved
-- Kodi 21 and Kodi 22 now build from separate branches and are released separately, so a fix can ship to one without waiting for the other
+- Renumbered to Kodi's scheme: 22.x.y is Kodi 22, 21.x.y is Kodi 21
+- Kodi 21 and Kodi 22 build and release from separate branches
 
 v0.3.5
-- Revert v0.3.4 dynamic ptsStart. That approach read state from internal
-  m_tempoOutputPts/m_tempoContentPts counters that advance on packet
-  EMISSION. When demux runs ahead of audio consumption (e.g. ActiveAE
-  stalls), those counters overstate elapsed content, so ptsStart drifts
-  beyond any sensible value and state.time = clock − ptsStart explodes
-  past tempo rate (observed OSD racing far beyond 2× at 2× tempo).
-- Return to v0.3.3 approach: GetTimes returns false when tempo is active,
-  VideoPlayer falls through to its IDisplayTime branch. That branch uses
-  state.dts and m_CurrentAudio.dispTime, which VideoPlayer populates
-  AFTER consuming packets — so the derived offset tracks actual playback
-  position rather than emission.
+- Revert v0.3.4: emission counters overstated elapsed content
+- Back to v0.3.3's IDisplayTime route for the OSD
 
 v0.3.4
-- VideoPlayer: OSD progress now reports content position at non-1x tempo.
-  v0.3.3 tried routing via the IDisplayTime branch (returning false from
-  GetTimes so VideoPlayer would use dispTime - dts) but state.time still
-  advanced at wall-clock rate. Switched to the ITimes branch with a
-  dynamic ptsStart = (m_tempoOutputPts - m_tempoContentPts), so
-    state.time = (clock - ptsStart) / 1000
-               = output - (output - content) = content
-  directly, without relying on dispTime propagation. ptsStart refreshes
-  on every emitted packet, so it tracks live tempo changes. Non-tempo
-  playback is unaffected.
+- OSD position follows tempo under VideoPlayer, via a dynamic ptsStart
 
 v0.3.3
-- VideoPlayer: make progress display follow tempo changes. GetTimes()
-  now returns false when tempo is active, so VideoPlayer routes through
-  its IDisplayTime branch (state.time += dispTime - dts) instead of
-  the ITimes branch (state.time = wall-clock). The ITimes path ignores
-  dispTime entirely and progress would advance at wall-clock rate
-  regardless of tempo. Non-tempo playback is unaffected.
+- OSD progress follows tempo changes under VideoPlayer
 
 v0.3.2
-- Fix audio glitching under VideoPlayer at non-1× tempo. v0.3.1 made
-  packet pts/dts/duration advance by content time, which broke ActiveAE's
-  wall-clock sync (packet PTS grew faster than samples drained, triggering
-  hard resyncs every ~1-2s at 2× tempo). Now two separate PTS streams:
-    - packet.pts/dts/duration → output (wall-clock) time, for ActiveAE
-    - packet.dispTime (ms) + m_currentPts → content time, for OSD and
-      GetTime() / PAPlayer resume.
-  VideoPlayer reads dispTime for its progress display; PAPlayer reads
-  GetTime() via ICodec — both now get content time, audio stays in sync.
+- Fix audio glitching under VideoPlayer at non-1× tempo
+- Packets carry output time; dispTime and GetTime() carry content time
 
 v0.3.1
-- Tempo PTS tracking: advance m_tempoOutputPts by content duration
-  (output duration × m_currentTempo) instead of output duration.
-  Fixes OSD current-position/progress-bar showing wall-clock time at
-  non-1× tempo — now tracks content time correctly for both PAPlayer
-  (with the ICodec::GetTime() addition in Kodi master) and VideoPlayer
-  via the existing dispTime path.
+- OSD position tracks content time, not wall clock
 
 v0.3.0
-- Keymap: PgUp/PgDn for speed up/down (replaces square brackets).
-- start_time property: pre-sets m_currentPts so GetTime() returns the
-  resume position immediately. Actual seeking is handled by PAPlayer's
-  native audiobook_bookmark mechanism (set by the calling addon).
-- Tempo PTS tracking: m_currentPts now updated from tempo output packets
-  in DemuxRead (was missing — only the non-tempo path updated it).
-  m_tempoSeekPending anchors output PTS to the actual seek landing.
-- Faster stream open: analyzeduration=0.5s, probesize=128KB for tempo
-  streams (was FFmpeg default 5s/5MB).
-- OSD duration: GetTotalTime() prefers audio stream duration over container
-  duration when tempo is active.
-- Source audio info: OSD shows source bitrate/bitsPerSample instead of
-  PCM float values. Codec name stays pcm_f32le (needed by Kodi decoder).
-- Speed display always uses two decimal places (1.25x not 1.2x).
-- DemuxAbort() in TimeshiftStream::Close() prevents deadlock.
-- libzvbi: iconv added as explicit dep + unconditional LIBS=-liconv.
-- Cross-compile fixes for all 10 platform targets (Linux x86_64/armv7/
-  aarch64, Android armv7/aarch64, each Kodi 21+22).
+- Keymap: PgUp/PgDn for speed up/down (was square brackets)
+- start_time property pre-sets the resume position for GetTime()
+- Faster stream open for tempo streams (analyzeduration 0.5s, probesize 128KB)
+- OSD duration prefers the audio stream's over the container's
+- OSD shows the source bitrate and sample size, not the PCM values
+- Speed display always two decimals (1.25x)
+- Fix a deadlock closing a timeshift stream
+- Cross-compile fixes for all ten platform targets
 
 v0.2.24
-- Set CPU=arm / CPU=aarch64 in the Linux cross-compile toolchain stubs.
-  Without it, ffmpeg's configure picked the host arch and generated x86
-  assembly ("impossible constraint in asm") when compiled with the ARM
-  gcc. Same CACHE-var trick as the Android stubs so CPU propagates to
-  every dep sub-build.
+- Set CPU in the Linux ARM cross-compile toolchains
 
 v0.2.23
-- Restore full release matrix (Linux x86_64/armv7/aarch64 + Android
-  armv7/aarch64, each on Kodi 21 Omega and Kodi 22 master). First release
-  where cross-compile is expected to work end-to-end after the fixes in
-  v0.2.12-0.2.22.
+- Restore the full release matrix (Linux and Android, Kodi 21 and 22)
 
 v0.2.22
-- Disable gnutls zstd+brotli compression support (--without-zstd/brotli).
-  Configure auto-detected the host system's zstd.pc and enabled the code,
-  but the vendored fallback header doesn't define ZSTD_CLEVEL_DEFAULT so
-  the cross-compile failed.
-- Also pin PKG_CONFIG_LIBDIR/PATH to the cross-built deps dir globally so
-  other autoconf deps don't auto-pick-up host-system libs.
+- Disable gnutls zstd and brotli support, which broke the cross-compile
+- Pin pkg-config to the cross-built deps
 
 v0.2.21
-- Pass --host=<triplet> to autoconf-based deps (gmp, gnutls, iconv, libzvbi,
-  nettle). v0.2.20 got the cross-compiler into autoconf via CC= env, but
-  iconv's configure tried to *run* the resulting ARM test binary on the
-  x86_64 host. --host tells autoconf to skip AC_TRY_RUN. Triplet exported
-  from build.sh as AUTOCONF_HOST per target.
+- Pass --host to the autoconf deps, so configure stops running ARM binaries
 
 v0.2.20
-- Fix cross-compile for autoconf-based deps (gnutls, nettle, gmp, iconv,
-  libzvbi, bz2, xz-utils). Their CMakeLists.txt invokes configure without
-  passing CC=, so autoconf was detecting the host gcc and building
-  x86_64 archives that the cross linker rejected ("libgnutls.a is
-  incompatible with armelf_linux_eabi"). Export CC/CXX/AR/STRIP/RANLIB
-  pointing at the cross toolchain in build.sh before invoking make;
-  configure inherits these and builds for the target arch. CMake-based
-  deps already use the toolchain file and are unaffected.
+- Point the autoconf deps at the cross toolchain (CC, AR, STRIP, RANLIB)
 
 v0.2.19
-- ffmpeg configure wrapper now also dumps config.log on failure so we can
-  see the real compile-test error behind ffmpeg's misleading "gnutls not
-  found using pkg-config" message.
+- Dump config.log when the ffmpeg configure fails
 
 v0.2.18
-- ffmpeg configure is now launched via a generated wrapper script that
-  explicitly exports PKG_CONFIG_PATH / PKG_CONFIG_LIBDIR and prints a
-  diagnostic dump first. Previous cmake-level attempts (bash-style VAR=val
-  prefix, then `cmake -E env VAR=val ...`) didn't reliably propagate the
-  env vars to the configure script's child pkg-config invocation in
-  cross-compile contexts.
+- Run the ffmpeg configure through a wrapper that exports PKG_CONFIG_*
 
 v0.2.17
-- Also set PKG_CONFIG_LIBDIR for ffmpeg configure, not just PKG_CONFIG_PATH.
-  On Ubuntu CI runners the host system has gnutls.pc at the default pkg-
-  config path, so PKG_CONFIG_PATH alone let pkg-config fall back to host
-  libs which the Android/ARM cross-linker can't resolve. LIBDIR replaces
-  the default search path so pkg-config pins to the cross-built libs only.
+- Set PKG_CONFIG_LIBDIR too, so pkg-config cannot fall back to host libs
 
 v0.2.16
-- Fix cross-compile pkg-config discovery in ffmpeg configure: wrap the
-  configure command with `cmake -E env PKG_CONFIG_PATH=...` instead of the
-  bash-style env-var prefix, which doesn't survive CMake's execute_process
-  in cross-compile contexts. Was masked on native x86_64 because system
-  pkg-config paths already contained gnutls.pc.
+- Fix pkg-config discovery in the ffmpeg configure for cross builds
 
 v0.2.15
-- Fix Android ffmpeg configure: override CMAKE_C_COMPILER to the NDK's
-  per-target wrapper (e.g. armv7a-linux-androideabi21-clang) which bakes
-  the target triple in. Upstream NDK sets CMAKE_C_COMPILER to plain clang
-  and puts the target in CMAKE_C_COMPILER_TARGET; ffmpeg's configure only
-  consumes --cc=${CMAKE_C_COMPILER} so the target was lost and clang
-  couldn't create executables during the configure-time test.
+- Use the NDK's per-target clang wrapper for the ffmpeg configure
 
 v0.2.14
-- Fix Android cross-compile: set CPU as a CACHE var in the toolchain file so
-  it survives into dep external_projects. Kodi's HandleDepends.cmake doesn't
-  forward -DCPU through BUILD_ARGS, so ffmpeg's CMakeLists previously saw
-  CPU as empty and fell through to --cpu=i686 --disable-mmx, breaking the
-  ARM clang.
-- Revert the libzvbi LIBS=-liconv change for non-Android hosts (it broke
-  fresh Linux runners — Ubuntu's glibc supplies iconv via libc, so adding
-  -liconv made the configure-time compiler test fail).
+- Set CPU as a cache var so it reaches the Android dep sub-builds
+- Revert the libzvbi -liconv change for non-Android hosts
 
 v0.2.11
-- First release built and tagged through the new GitHub Actions pipeline.
+- First release built and tagged through GitHub Actions
 
 v0.2.10
-- Add xbmc.service extension so the background service actually runs under Kodi
-- Install per-addon keymap (reinstalled when the shipped file changes)
-- Speed control script: [ / ] step, Backspace reset, s / menu dialog picker
-- Values driven by a shared JSON config file written by the calling addon
-- Debounced speed-change notification (single toast after key-repeat settles)
-- Sentinel file gates the key bindings and Active window property so they do
-  nothing (and the dialog doesn't appear) when tempo is not the active stream
-- Replace removed xbmc.translatePath with xbmcvfs.translatePath (Kodi 21)
-- Runner sets Window(Home).Property(InputstreamTempo.Speed / SpeedDisplay /
-  Active) for skin integration
+- Background service runs under Kodi (xbmc.service extension)
+- Per-addon keymap, reinstalled when the shipped file changes
+- Speed control: [ / ] step, Backspace reset, s for the dialog
+- Values driven by a shared JSON config from the calling add-on
+- Debounced speed-change notification
+- Sentinel gates the keys and the Active property to tempo playback
+- Window properties for skin integration (Speed, SpeedDisplay, Active)
 
 v22.2.0
 - Bump ffmpeg to 8.0 and add patch to merge in libpostproc plugin before ffmpeg-build
