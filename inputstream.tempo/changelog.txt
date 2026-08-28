@@ -1,3 +1,20 @@
+v21.4.4
+- Tempo works on a video stream whose audio parameters are not in the
+  container header. The small probe budget added for audiobooks
+  (analyzeduration 0.5s, probesize 128KB) was applied to every tempo-enabled
+  stream, on the premise that the header already carries the codec
+  parameters. A Jellyfin HLS transcode breaks that premise: 128KB of a
+  6 Mb/s stream is a fraction of the first video keyframe, so
+  find_stream_info returned before parsing an ADTS header and the AAC track
+  arrived with 0 channels. abuffer then rejected the empty channel_layout
+  with EINVAL and the whole playback fell back to passthrough -- no tempo,
+  and for a SyncPlay member no fine sync either. Measured on a Pixel 7 Pro:
+  7 of 7 stream opens. The budget now applies only when there is no video
+  stream, which is the case it was written for; cover art does not count.
+- Audio parameters that are still unknown when the tempo pipeline is built
+  say so, instead of failing three frames later with a bare
+  "Tempo: failed to create abuffer: -22".
+
 v21.4.3
 - Chapter jumps and video seeks land where you asked again. 21.4.2 fixed
   seeking by undoing the time_offset Kodi applies to a seek target, but did

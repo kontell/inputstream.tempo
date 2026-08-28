@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="21.4.3"
+  version="21.4.4"
   name="Inputstream Tempo"
   provider-name="kontell">
   <requires>@ADDON_DEPENDS@</requires>
