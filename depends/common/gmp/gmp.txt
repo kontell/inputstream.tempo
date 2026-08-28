@@ -1,1 +1,1 @@
-gmp https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+gmp https://mirrors.kodi.tv/build-deps/sources/gmp-6.3.0.tar.xz
