@@ -1,1 +1,1 @@
-iconv https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz
+iconv https://mirrors.kodi.tv/build-deps/sources/libiconv-1.18.tar.gz
