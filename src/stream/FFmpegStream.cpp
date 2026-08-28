@@ -90,6 +90,25 @@ bool AttachmentIsFont(const AVDictionaryEntry* dict)
   }
   return false;
 }
+
+// Video for the purposes of "is this the single-stream audio file the small
+// probe was written for". Cover art arrives as a video stream with
+// ATTACHED_PIC set and must not count: an audiobook with a cover is still an
+// audiobook. Reads codecpar directly because m_streams is not built until
+// after avformat_find_stream_info, which is what the caller is configuring.
+bool HasNonCoverVideoStream(const AVFormatContext* ctx)
+{
+  if (!ctx)
+    return false;
+  for (unsigned int i = 0; i < ctx->nb_streams; i++)
+  {
+    const AVStream* st = ctx->streams[i];
+    if (st && st->codecpar && st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
+        !(st->disposition & AV_DISPOSITION_ATTACHED_PIC))
+      return true;
+  }
+  return false;
+}
 } // namespace
 
 static int interrupt_cb(void* ctx)
@@ -1290,7 +1309,19 @@ bool FFmpegStream::Open(bool fileinfo)
   // (5 seconds of content) and probesize (5 MB) are wildly excessive for a
   // single-stream audio file. But analyzeduration=0 breaks MP3 VBR seeking
   // (no seek table is built), so use a small but non-zero value.
-  if (m_tempoEnabled)
+  //
+  // Only when there really is no video. That premise -- the header carries
+  // the parameters -- does not hold for a Jellyfin HLS transcode, which
+  // reaches here whenever a SyncPlay member has to transcode: 128KB of a
+  // 6 Mb/s stream is a fraction of the first video keyframe, so
+  // find_stream_info returns before it has parsed an ADTS header and the AAC
+  // track arrives with 0 channels. That is not survivable downstream -- the
+  // stream is advertised as PCM with 0 channels and BuildFilterGraph's
+  // abuffer args carry an empty channel_layout, which fails EINVAL and drops
+  // the whole playback to passthrough (no tempo, so no fine sync). ffprobe's
+  // defaults read 6 channels off the same URL, so the probe budget is the
+  // whole of it. Measured on a Pixel 7 Pro, 2026-08-28.
+  if (m_tempoEnabled && !HasNonCoverVideoStream(m_pFormatContext))
   {
     av_opt_set_int(m_pFormatContext, "analyzeduration", 500000, 0);  // 0.5s
     av_opt_set_int(m_pFormatContext, "probesize", 131072, 0);        // 128KB
@@ -3239,6 +3270,22 @@ bool FFmpegStream::InitTempoProcessing(AVStream* audioStream)
     // Opus always outputs flt/fltp. Pick fltp as a sensible default;
     // the decoder will use whatever it actually emits at runtime.
     m_audioDecoderCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+  }
+
+  // Say so here rather than let BuildFilterGraph fail with a bare "abuffer:
+  // -22" three frames later. Without a rate and a channel count there is
+  // nothing to build a filter from and nothing honest to advertise as PCM
+  // either, so the stream keeps its own codec and Kodi decodes it. Reaching
+  // this means the probe ended before the demuxer had parsed a frame header
+  // -- see the analyzeduration/probesize block in Open().
+  if (m_audioDecoderCtx->sample_rate <= 0 || m_audioDecoderCtx->ch_layout.nb_channels <= 0)
+  {
+    Log(LOGLEVEL_WARNING,
+        "Tempo: audio parameters still unknown after the probe (rate %d, ch %d) -- "
+        "no tempo for this stream",
+        m_audioDecoderCtx->sample_rate, m_audioDecoderCtx->ch_layout.nb_channels);
+    avcodec_free_context(&m_audioDecoderCtx);
+    return false;
   }
 
   m_decodedFrame = av_frame_alloc();
