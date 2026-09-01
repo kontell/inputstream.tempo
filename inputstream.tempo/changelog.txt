@@ -1,3 +1,6 @@
+v21.4.5
+- Catchup streams no longer jump backward at the live edge
+
 v21.4.4
 - Tempo works on streams whose audio format is not in the container header
 - Clearer log when the audio format is still unknown at pipeline build
