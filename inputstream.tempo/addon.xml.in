@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="inputstream.tempo"
-  version="22.4.4"
+  version="22.4.5"
   name="Inputstream Tempo"
   provider-name="kontell">
   <requires>@ADDON_DEPENDS@</requires>
@@ -18,6 +18,6 @@
     <license>GPL-2.0-or-later</license>
     <summary lang="en_GB">InputStream client with tempo control (pitch-corrected playback speed) for audio and video</summary>
     <description lang="en_GB">InputStream client based on FFmpeg with built-in tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts, and rate-shifts video and subtitles in step with the audio so the same control works for video. Based on inputstream.ffmpegdirect.</description>
-    <news>v22.4.4 Tempo works on streams whose audio format is not in the container header, such as a Jellyfin HLS transcode. v22.4.3 Chapter jumps and video seeks land on target. v22.4.2 Seeks land on target, and the speed keys work for add-ons that keep their rate in a file of their own. v22.4.1 Seeks keep the first packets of the new position. v22.4.0 Tempo covers video: video and subtitles follow the audio's time map, so an item stays in sync at any rate.</news>
+    <news>v22.4.5 Catchup streams no longer jump backward at the live edge. Builds against FFmpeg 9, and the gmp gcc-15 patch now applies on Linux. v22.4.4 Tempo works on streams whose audio format is not in the container header, such as a Jellyfin HLS transcode. v22.4.3 Chapter jumps and video seeks land on target. v22.4.2 Seeks land on target, and the speed keys work for add-ons that keep their rate in a file of their own. v22.4.1 Seeks keep the first packets of the new position. v22.4.0 Tempo covers video: video and subtitles follow the audio's time map, so an item stays in sync at any rate.</news>
   </extension>
 </addon>
