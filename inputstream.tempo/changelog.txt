@@ -1,3 +1,8 @@
+v22.4.5
+- Catchup streams no longer jump backward at the live edge
+- Builds against FFmpeg 9
+- The gmp gcc-15 patch now applies on Linux
+
 v22.4.4
 - Tempo works on streams whose audio format is not in the container header
 - Clearer log when the audio format is still unknown at pipeline build
