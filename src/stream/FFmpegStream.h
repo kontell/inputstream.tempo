@@ -298,6 +298,22 @@ private:
   bool HasVideoStream() const;
   double QueueSecsForReadout() const;
   double CurrentDelta() const;
+  // The start ConvertTimestamp() subtracts: the container's own timestamps
+  // begin here. Added back to the head's content position it gives
+  // `source_ms` in the state line — the source's clock (an MPEG-TS PTS on
+  // a broadcast), which every member of a SyncPlay group playing one live
+  // feed shares whatever their own stream's start was. ffmpeg unwraps the
+  // 33-bit PTS within a session, so the value can pass 2^33/90kHz; the
+  // caller compares modulo that period.
+  double SourceStartSecs() const;
+  // What Kodi's player clock reads for the packet at the demux head, in
+  // whichever frame this stream class reports time in — `player_ms` in the
+  // state line. Here GetTimes() reports ptsStart = -Δ (and the realtime
+  // IDisplayTime path stamps content dispTime), so the player clock runs in
+  // content time; a catchup stream reports ptsStart = 0 against its shifted
+  // output clock and overrides. A caller reads the source clock for its own
+  // playing position as Player.getTime() + (source_ms − player_ms).
+  virtual double HeadPlayerMs(double contentMs, double outputMs) const;
   void ResetTempoMapForSeek();
   void NoteOutputHead(double outputDts);
   void ProjectPacket(DEMUX_PACKET* pkt, int streamIdx);

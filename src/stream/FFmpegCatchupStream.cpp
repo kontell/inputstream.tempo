@@ -370,6 +370,16 @@ void FFmpegCatchupStream::CurrentPTSUpdated()
     m_currentPts += m_seekOffset;
 }
 
+double FFmpegCatchupStream::HeadPlayerMs(double contentMs, double outputMs) const
+{
+  // GetTimes() reports ptsStart = 0 against the catchup buffer, so the
+  // player clock is the output clock as DemuxRead() shifts it — until the
+  // buffer is known, when the base class's frame applies.
+  if (m_catchupBufferStartTime == 0)
+    return FFmpegStream::HeadPlayerMs(contentMs, outputMs);
+  return outputMs + m_seekOffset / 1000.0;
+}
+
 bool FFmpegCatchupStream::IsRealTimeStream()
 {
   if (kodi::addon::GetSettingBoolean("forceRealtimeOffCatchup"))

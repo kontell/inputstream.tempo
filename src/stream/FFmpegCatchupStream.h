@@ -41,6 +41,7 @@ public:
   virtual int64_t LengthStream() override;
   virtual bool GetTimes(kodi::addon::InputstreamTimes& times) override;
   virtual bool IsRealTimeStream() override;
+  double HeadPlayerMs(double contentMs, double outputMs) const override;
 
 protected:
   void CurrentPTSUpdated() override;
