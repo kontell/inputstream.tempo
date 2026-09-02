@@ -16,6 +16,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <memory>
 #include <thread>
@@ -3550,6 +3552,23 @@ void FFmpegStream::DestroyTempoProcessing()
   m_tempoAudioStreamIndex = -1;
 }
 
+void FFmpegStream::ApplyQueueSecsDirective(const char* text)
+{
+  // An optional second line, "queue_secs=<s>": the depth of Kodi's demux
+  // queue for this play, from the caller that writes the rate. A stream
+  // whose properties carried no queue_secs (a PVR add-on cannot know a
+  // setting a kofin session shortens) would otherwise report its position
+  // — and a pulse's shift — up to 8 s behind the packet Kodi is playing.
+  const char* directive = strstr(text, "queue_secs=");
+  if (!directive)
+    return;
+  const double secs = atof(directive + strlen("queue_secs="));
+  if (secs <= 0.0 || secs > 60.0 || std::abs(secs - m_queueSecs) < 0.01)
+    return;
+  Log(LOGLEVEL_INFO, "Tempo: queue_secs %.2f -> %.2f from the tempo file", m_queueSecs, secs);
+  m_queueSecs = secs;
+}
+
 void FFmpegStream::CheckTempoFileUpdate()
 {
   if (m_tempoFilePath.empty())
@@ -3568,6 +3587,8 @@ void FFmpegStream::CheckTempoFileUpdate()
     const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     fclose(f);
     buf[n] = '\0';
+
+    ApplyQueueSecsDirective(buf);
 
     const double newTempo = ParseTempo(buf);
     if (newTempo < 0.5 || newTempo > 100.0)

@@ -348,6 +348,7 @@ private:
   void DestroyTempoProcessing();
   bool BuildFilterGraph(double tempo);
   void CheckTempoFileUpdate();
+  void ApplyQueueSecsDirective(const char* text);
   void ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream);
 };
 
