@@ -43,7 +43,6 @@ public:
 
   virtual int64_t LengthStream() override;
   virtual bool IsRealTimeStream() override;
-  double HeadPlayerMs(double contentMs, double outputMs) const override;
 
 private:
   void DoReadWrite();

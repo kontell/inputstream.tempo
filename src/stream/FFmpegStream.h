@@ -123,6 +123,27 @@ protected:
   // output clock and overrides. A caller reads the source clock for its own
   // playing position as Player.getTime() + (source_ms − player_ms).
   virtual double HeadPlayerMs(double contentMs, double outputMs) const;
+  // ── Tempo at read-out ──
+  // A stream that fills a buffer from an input thread and serves Kodi from
+  // it (TimeshiftStream) runs the tempo stage where Kodi reads, not where
+  // the input thread demuxes: a rate change has to reach the packet Kodi is
+  // about to play rather than one it will consume when the buffer has
+  // drained, and the tempo file has to be polled at Kodi's read cadence, not
+  // at the source's segment cadence (measured on a live HLS: a pulse never
+  // confirmed). Such a class sets the flag; ReadNew() then stores raw
+  // content-domain packets and ApplyTempoOnRead() does on the way out what
+  // ReadNew() would have done on the way in.
+  bool m_tempoAtReadout = false;
+  bool TempoOnInput() const { return m_tempoEnabled && !m_tempoAtReadout; }
+  bool TempoEnabled() const { return m_tempoEnabled; }
+  bool HasTempoOutput() const { return !m_tempoOutputQueue.empty(); }
+  double CurrentDeltaMs() const;
+  DEMUX_PACKET* PopTempoOutput();
+  void PollTempoFile();
+  void FlushTempoForSeek();
+  double ReportedDeltaForTimes();
+  DEMUX_PACKET* ApplyTempoOnRead(DEMUX_PACKET* raw);
+  int64_t ToStreamTimestamp(double dvdTime, int den, int num) const;
   virtual std::string GetStreamCodecName(int iStreamId);
   virtual void CurrentPTSUpdated();
   bool IsPaused() { return m_speed == STREAM_PLAYSPEED_PAUSE; }
