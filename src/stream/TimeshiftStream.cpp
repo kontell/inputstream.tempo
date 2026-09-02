@@ -133,6 +133,13 @@ bool TimeshiftStream::GetTimes(kodi::addon::InputstreamTimes& times)
   return true;
 }
 
+double TimeshiftStream::HeadPlayerMs(double contentMs, double outputMs) const
+{
+  // GetTimes() reports ptsStart = 0 against the timeshift buffer, so the
+  // player clock is the output clock.
+  return outputMs;
+}
+
 bool TimeshiftStream::IsRealTimeStream()
 {
   return true;
