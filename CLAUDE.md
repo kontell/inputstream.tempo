@@ -70,6 +70,24 @@ other audio tracks get `AVDISCARD_ALL` and their packets never reach Kodi. If th
 new track cannot be decoded, tempo switches off and all audio streams are
 re-advertised with their real codecs.
 
+**Tempo at read-out (timeshift).** `TimeshiftStream` fills its disk buffer from
+an input thread that runs `FFmpegStream::DemuxRead()` at the source's pace and
+serves Kodi from the buffer. A rate stage on that input side acts on packets Kodi
+consumes only once the buffer has drained, and the tempo file gets polled at the
+source's segment cadence — measured on a live HLS: a SyncPlay pulse never
+confirmed. So a class that serves from a buffer sets `m_tempoAtReadout`:
+`ReadNew()` (gated by `TempoOnInput()`) then stores raw content-domain packets,
+and `ApplyTempoOnRead()` does on the way out what `ReadNew()` does on the way in
+— the tempo audio stream is rebuilt into an `AVPacket` (`ToStreamTimestamp()`,
+the inverse of `ConvertTimestamp()`) and run through
+`ProcessAudioPacketWithTempo()`, other audio is dropped, video and subtitles
+go through `ProjectPacket()`. The poll (`PollTempoFile()`), the seek flush
+(`FlushTempoForSeek()`) and the Δ-folded `GetTimes()` (ptsStart = −Δ, the buffer
+bounds shifted alike) all live on Kodi's read side, so the OSD, `getTime()` and
+seek targets read content time there as they do for a plain stream. The input
+thread never touches the map, the decoder or the state file; the read side
+never walks `m_streams`.
+
 The tempo file is polled by wall clock every 250 ms (`kTempoPollInterval`) via
 `CheckTempoFileUpdate()`. Live changes use `avfilter_graph_send_command()` where
 possible, falling back to a full graph rebuild. Each change starts a new map

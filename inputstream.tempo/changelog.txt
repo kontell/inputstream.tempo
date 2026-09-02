@@ -1,5 +1,6 @@
 v21.4.6
 - The state line now carries the head's position on the source's own clock (`source_ms`) and the player-clock reading for it (`player_ms`), so players of one live feed can place themselves on a shared timeline
+- Timeshift streams apply the rate where Kodi reads from the buffer rather than where the input thread fills it, so a rate change takes effect at once and a tempo file is polled at the player's pace; the OSD and seeks read content time on a timeshifted stream as on any other
 
 v22.4.5
 - Catchup streams no longer jump backward at the live edge
