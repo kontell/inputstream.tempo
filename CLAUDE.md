@@ -42,8 +42,13 @@ Set on the ListItem by the calling add-on:
 
 The add-on writes back to **`<tempo_file>.state`** — one JSON line, replaced
 atomically, on every applied tempo change, anchor and audio re-target:
-`{"seq","event","tempo","content_ms","output_ms","delta_ms","queue_secs","video"}`.
-A caller confirms a change landed by watching `seq`/`event`.
+`{"seq","event","tempo","content_ms","output_ms","delta_ms","queue_secs","video","source_ms","player_ms"}`.
+A caller confirms a change landed by watching `seq`/`event`. `source_ms` is the head on
+the container's own clock (`SourceStartSecs()` added back — the start `ConvertTimestamp()`
+subtracts) and `player_ms` the player-clock reading for that head in the stream class's
+own frame (`HeadPlayerMs()`: content time here, the shifted output clock for a catchup
+stream); a SyncPlay member reads the shared source clock as `getTime() + (source_ms −
+player_ms)`.
 
 **Resume seeking is not done here.** The calling add-on sets PAPlayer's
 `audiobook_bookmark`, which PAPlayer applies natively before audio output begins.

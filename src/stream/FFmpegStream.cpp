@@ -530,14 +530,19 @@ void FFmpegStream::WriteTempoState(const char* event)
   const std::string tmp = path + ".tmp";
   const bool anchored = m_tempoMap.HasAnchor() && !m_tempoAnchorPending;
 
+  const double contentMs = m_tempoContentPts / 1000.0;
+  const double outputMs = m_tempoOutputPts / 1000.0;
+
   char buf[512];
   snprintf(buf, sizeof(buf),
            "{\"seq\":%llu,\"event\":\"%s\",\"tempo\":%.4f,\"content_ms\":%.1f,"
-           "\"output_ms\":%.1f,\"delta_ms\":%.1f,\"queue_secs\":%.2f,\"video\":%s}\n",
+           "\"output_ms\":%.1f,\"delta_ms\":%.1f,\"queue_secs\":%.2f,\"video\":%s,"
+           "\"source_ms\":%.1f,\"player_ms\":%.1f}\n",
            static_cast<unsigned long long>(++m_tempoStateSeq), event, m_currentTempo,
-           anchored ? m_tempoContentPts / 1000.0 : -1.0,
-           anchored ? m_tempoOutputPts / 1000.0 : -1.0, CurrentDelta() / 1000.0,
-           QueueSecsForReadout(), m_hasVideo ? "true" : "false");
+           anchored ? contentMs : -1.0, anchored ? outputMs : -1.0, CurrentDelta() / 1000.0,
+           QueueSecsForReadout(), m_hasVideo ? "true" : "false",
+           anchored ? contentMs + SourceStartSecs() * 1000.0 : -1.0,
+           anchored ? HeadPlayerMs(contentMs, outputMs) : -1.0);
 
   // C stdio for the same reason as CheckTempoFileUpdate: no iostreams in a
   // library that carries its own libstdc++.
@@ -1653,6 +1658,24 @@ void FFmpegStream::ResetVideoStreams()
 
 void FFmpegStream::CurrentPTSUpdated()
 {
+}
+
+double FFmpegStream::SourceStartSecs() const
+{
+  // Mirrors the starttime ConvertTimestamp() subtracts, branch for branch.
+  if (m_checkTransportStream)
+    return m_startTime;
+
+  if (m_pFormatContext &&
+      m_pFormatContext->start_time != static_cast<int64_t>(AV_NOPTS_VALUE))
+    return static_cast<double>(m_pFormatContext->start_time) / AV_TIME_BASE;
+
+  return 0.0;
+}
+
+double FFmpegStream::HeadPlayerMs(double contentMs, double outputMs) const
+{
+  return contentMs;
 }
 
 double FFmpegStream::ConvertTimestamp(int64_t pts, int den, int num)

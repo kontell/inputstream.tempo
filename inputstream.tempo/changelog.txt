@@ -1,3 +1,6 @@
+v22.4.6
+- The state line now carries the head's position on the source's own clock (`source_ms`) and the player-clock reading for it (`player_ms`), so players of one live feed can place themselves on a shared timeline
+
 v22.4.5
 - Catchup streams no longer jump backward at the live edge
 - Builds against FFmpeg 9
