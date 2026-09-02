@@ -15,6 +15,9 @@
 #include "IManageDemuxPacket.h"
 
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <memory>
 #include <thread>
@@ -530,14 +533,19 @@ void FFmpegStream::WriteTempoState(const char* event)
   const std::string tmp = path + ".tmp";
   const bool anchored = m_tempoMap.HasAnchor() && !m_tempoAnchorPending;
 
+  const double contentMs = m_tempoContentPts / 1000.0;
+  const double outputMs = m_tempoOutputPts / 1000.0;
+
   char buf[512];
   snprintf(buf, sizeof(buf),
            "{\"seq\":%llu,\"event\":\"%s\",\"tempo\":%.4f,\"content_ms\":%.1f,"
-           "\"output_ms\":%.1f,\"delta_ms\":%.1f,\"queue_secs\":%.2f,\"video\":%s}\n",
+           "\"output_ms\":%.1f,\"delta_ms\":%.1f,\"queue_secs\":%.2f,\"video\":%s,"
+           "\"source_ms\":%.1f,\"player_ms\":%.1f}\n",
            static_cast<unsigned long long>(++m_tempoStateSeq), event, m_currentTempo,
-           anchored ? m_tempoContentPts / 1000.0 : -1.0,
-           anchored ? m_tempoOutputPts / 1000.0 : -1.0, CurrentDelta() / 1000.0,
-           QueueSecsForReadout(), m_hasVideo ? "true" : "false");
+           anchored ? contentMs : -1.0, anchored ? outputMs : -1.0, CurrentDelta() / 1000.0,
+           QueueSecsForReadout(), m_hasVideo ? "true" : "false",
+           anchored ? contentMs + SourceStartSecs() * 1000.0 : -1.0,
+           anchored ? HeadPlayerMs(contentMs, outputMs) : -1.0);
 
   // C stdio for the same reason as CheckTempoFileUpdate: no iostreams in a
   // library that carries its own libstdc++.
@@ -631,49 +639,17 @@ void FFmpegStream::FreePendingPackets()
 DEMUX_PACKET* FFmpegStream::ReadNew()
 {
   // Return buffered tempo-processed packets first
-  if (m_tempoEnabled && !m_tempoOutputQueue.empty())
-  {
-    DEMUX_PACKET* queued = m_tempoOutputQueue.front();
-    m_tempoOutputQueue.pop();
+  if (TempoOnInput() && !m_tempoOutputQueue.empty())
+    return PopTempoOutput();
 
-    // Resolve stream ID to unique ID
-    if (queued->iStreamId >= 0)
-    {
-      DemuxStream* stream = GetDemuxStream(queued->iStreamId);
-      if (stream)
-      {
-        queued->iStreamId = stream->uniqueId;
-        queued->demuxerId = m_demuxerId;
-      }
-    }
-
-    NoteOutputHead(queued->dts);
-    // Keep m_currentPts tracking consumed content (GetTime()) in sync on
-    // this pop path too — previously only the inner path did this.
-    const double contentPts = STREAM_MSEC_TO_TIME(queued->dispTime);
-    if (contentPts > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE)
-      m_currentPts = contentPts;
-
-    return queued;
-  }
-
-  // Poll the tempo file by wall clock, so the latency of a change does not
-  // depend on the packet rate (it used to be every 50 reads).
-  if (m_tempoEnabled && !m_tempoFilePath.empty())
-  {
-    const auto now = std::chrono::steady_clock::now();
-    if (now - m_lastTempoPoll >= kTempoPollInterval)
-    {
-      m_lastTempoPoll = now;
-      CheckTempoFileUpdate();
-    }
-  }
+  if (TempoOnInput())
+    PollTempoFile();
 
   // Optional add-on-side lead bound for video items (lead_secs). Kodi's
   // queues are the normal pacing; this is the fallback switch for the flood
   // the wall-clock throttle was written against. It must never block the
   // player loop for long: hand back an empty packet after a short nap.
-  if (m_tempoEnabled && m_hasVideo && m_leadSecs > 0.0 &&
+  if (TempoOnInput() && m_hasVideo && m_leadSecs > 0.0 &&
       m_tempoFirstEmitWall != std::chrono::steady_clock::time_point{})
   {
     const double wallElapsed = std::chrono::duration<double>(
@@ -791,7 +767,7 @@ DEMUX_PACKET* FFmpegStream::ReadNew()
       if (pPacket)
       {
         // Tempo: route audio packets through decode+atempo pipeline
-        if (m_tempoEnabled && m_tempoAudioStreamIndex >= 0 &&
+        if (TempoOnInput() && m_tempoAudioStreamIndex >= 0 &&
             m_pkt.pkt.stream_index == m_tempoAudioStreamIndex)
         {
           // Free the pre-allocated packet — tempo pipeline creates its own
@@ -824,7 +800,7 @@ DEMUX_PACKET* FFmpegStream::ReadNew()
             bReturnEmpty = true;
           }
         }
-        else if (m_tempoEnabled && m_tempoAudioStreamIndex >= 0 && stream->codecpar &&
+        else if (TempoOnInput() && m_tempoAudioStreamIndex >= 0 && stream->codecpar &&
                  stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
           // Another audio track while the pipeline is bound to a different
@@ -889,7 +865,7 @@ DEMUX_PACKET* FFmpegStream::ReadNew()
         // Tempo: video and subtitle packets keep their data but their
         // timestamps move to the output domain through the shared map, so
         // they stay locked to the stretched audio at any rate.
-        if (m_tempoEnabled && stream->codecpar &&
+        if (TempoOnInput() && stream->codecpar &&
             (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO ||
              stream->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE))
           ProjectPacket(pPacket, m_pkt.pkt.stream_index);
@@ -1094,16 +1070,7 @@ bool FFmpegStream::GetTimes(kodi::addon::InputstreamTimes& times)
   // static value, so the 1.0↔non-1.0 transition is seamless.
   double ptsStart = 0.0;
   if (m_tempoEnabled)
-  {
-    double at = m_headOutputPts;
-    if (at != STREAM_NOPTS_VALUE)
-      at -= STREAM_SEC_TO_TIME(QueueSecsForReadout());
-    const double delta =
-        (at != STREAM_NOPTS_VALUE) ? m_tempoMap.DeltaAtOutput(at) : m_tempoMap.DeltaKeep();
-    m_deltaReported = delta;
-    m_deltaReportedValid = true;
-    ptsStart = -delta;
-  }
+    ptsStart = -ReportedDeltaForTimes();
 
   times.SetStartTime(0);
   times.SetPtsStart(ptsStart);
@@ -1655,6 +1622,155 @@ void FFmpegStream::CurrentPTSUpdated()
 {
 }
 
+double FFmpegStream::CurrentDeltaMs() const
+{
+  return CurrentDelta() * 1000.0 / STREAM_TIME_BASE;
+}
+
+double FFmpegStream::ReportedDeltaForTimes()
+{
+  // Δ at the packet Kodi is playing — QueueSecsForReadout() behind the
+  // head — recorded as the value the next seek must continue from.
+  double at = m_headOutputPts;
+  if (at != STREAM_NOPTS_VALUE)
+    at -= STREAM_SEC_TO_TIME(QueueSecsForReadout());
+  const double delta =
+      (at != STREAM_NOPTS_VALUE) ? m_tempoMap.DeltaAtOutput(at) : m_tempoMap.DeltaKeep();
+  m_deltaReported = delta;
+  m_deltaReportedValid = true;
+  return delta;
+}
+
+DEMUX_PACKET* FFmpegStream::PopTempoOutput()
+{
+  DEMUX_PACKET* queued = m_tempoOutputQueue.front();
+  m_tempoOutputQueue.pop();
+  // The stream index is the unique id (AddStream), so no map lookup: the
+  // read-out side must not walk m_streams while the input thread may be
+  // rebuilding it.
+  if (queued->iStreamId >= 0)
+    queued->demuxerId = m_demuxerId;
+  NoteOutputHead(queued->dts);
+  // Keep m_currentPts tracking consumed content (GetTime()) in sync on
+  // this pop path too — previously only the inner path did this.
+  const double contentPts = STREAM_MSEC_TO_TIME(queued->dispTime);
+  if (contentPts > m_currentPts || m_currentPts == STREAM_NOPTS_VALUE)
+    m_currentPts = contentPts;
+  return queued;
+}
+
+void FFmpegStream::PollTempoFile()
+{
+  // By wall clock, so the latency of a change does not depend on the packet
+  // rate (it used to be every 50 reads).
+  if (m_tempoFilePath.empty())
+    return;
+  const auto now = std::chrono::steady_clock::now();
+  if (now - m_lastTempoPoll >= kTempoPollInterval)
+  {
+    m_lastTempoPoll = now;
+    CheckTempoFileUpdate();
+  }
+}
+
+void FFmpegStream::FlushTempoForSeek()
+{
+  if (m_tempoEnabled && m_audioDecoderCtx)
+  {
+    avcodec_flush_buffers(m_audioDecoderCtx);
+    while (!m_tempoOutputQueue.empty())
+    {
+      m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
+      m_tempoOutputQueue.pop();
+    }
+    if (m_tempoEmittedPackets < 10)
+      BuildFilterGraph(m_currentTempo);
+  }
+  if (m_tempoEnabled)
+    ResetTempoMapForSeek(); // Δ continues; the counters re-anchor on the next packet
+}
+
+int64_t FFmpegStream::ToStreamTimestamp(double dvdTime, int den, int num) const
+{
+  // The inverse of ConvertTimestamp(): a content-domain timestamp back in
+  // the stream's own time base, for a packet the decoder is handed after it
+  // was stored in content time.
+  if (dvdTime == STREAM_NOPTS_VALUE || num <= 0)
+    return AV_NOPTS_VALUE;
+  const double raw = dvdTime / STREAM_TIME_BASE + SourceStartSecs();
+  return static_cast<int64_t>(std::llround(raw * den / num));
+}
+
+DEMUX_PACKET* FFmpegStream::ApplyTempoOnRead(DEMUX_PACKET* raw)
+{
+  // What ReadNew() does to a packet on the way in, done on the way out of
+  // a buffer instead (m_tempoAtReadout): the tempo audio stream is decoded,
+  // rate-shifted and re-emitted as PCM in output time, every other audio
+  // stream is dropped, video and subtitles are projected through the map.
+  // Runs on Kodi's read thread only; nothing here touches the format
+  // context beyond the stream's parameters, which do not change under it.
+  if (!raw || raw->iStreamId < 0 || !m_pFormatContext ||
+      raw->iStreamId >= static_cast<int>(m_pFormatContext->nb_streams))
+    return raw;
+
+  const int idx = raw->iStreamId;
+  AVStream* stream = m_pFormatContext->streams[idx];
+
+  if (idx == m_tempoAudioStreamIndex)
+  {
+    AVPacket* pkt = av_packet_alloc();
+    if (pkt && av_new_packet(pkt, raw->iSize) == 0)
+    {
+      if (raw->iSize > 0)
+        memcpy(pkt->data, raw->pData, raw->iSize);
+      pkt->stream_index = idx;
+      pkt->pts = ToStreamTimestamp(raw->pts, stream->time_base.den, stream->time_base.num);
+      pkt->dts = ToStreamTimestamp(raw->dts, stream->time_base.den, stream->time_base.num);
+      if (raw->duration > 0)
+        pkt->duration = static_cast<int64_t>(
+            std::llround(raw->duration / STREAM_TIME_BASE * stream->time_base.den / stream->time_base.num));
+      ProcessAudioPacketWithTempo(pkt, stream);
+    }
+    av_packet_free(&pkt);
+    m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(raw);
+    if (!m_tempoOutputQueue.empty())
+      return PopTempoOutput();
+    return m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(0);
+  }
+
+  if (m_tempoAudioStreamIndex >= 0 && stream->codecpar &&
+      stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+  {
+    m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(raw);
+    return m_demuxPacketManager->AllocateDemuxPacketFromInputStreamAPI(0);
+  }
+
+  if (stream->codecpar &&
+      (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO ||
+       stream->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE))
+    ProjectPacket(raw, idx);
+
+  return raw;
+}
+
+double FFmpegStream::SourceStartSecs() const
+{
+  // Mirrors the starttime ConvertTimestamp() subtracts, branch for branch.
+  if (m_checkTransportStream)
+    return m_startTime;
+
+  if (m_pFormatContext &&
+      m_pFormatContext->start_time != static_cast<int64_t>(AV_NOPTS_VALUE))
+    return static_cast<double>(m_pFormatContext->start_time) / AV_TIME_BASE;
+
+  return 0.0;
+}
+
+double FFmpegStream::HeadPlayerMs(double contentMs, double outputMs) const
+{
+  return contentMs;
+}
+
 double FFmpegStream::ConvertTimestamp(int64_t pts, int den, int num)
 {
   if (pts == (int64_t)AV_NOPTS_VALUE)
@@ -1991,19 +2107,7 @@ bool FFmpegStream::SeekTime(double time, bool backwards, double* startpts)
   // that. After a handful of emitted packets the filter is in steady state
   // and a rebuild costs more than it gains (brief audible gap at
   // user-initiated seeks), so skip it.
-  if (m_tempoEnabled && m_audioDecoderCtx)
-  {
-    avcodec_flush_buffers(m_audioDecoderCtx);
-    while (!m_tempoOutputQueue.empty())
-    {
-      m_demuxPacketManager->FreeDemuxPacketFromInputStreamAPI(m_tempoOutputQueue.front());
-      m_tempoOutputQueue.pop();
-    }
-    if (m_tempoEmittedPackets < 10)
-      BuildFilterGraph(m_currentTempo);
-  }
-  if (m_tempoEnabled)
-    ResetTempoMapForSeek();
+  FlushTempoForSeek();
 
   m_pkt.result = -1;
   av_packet_unref(&m_pkt.pkt);
@@ -3448,6 +3552,23 @@ void FFmpegStream::DestroyTempoProcessing()
   m_tempoAudioStreamIndex = -1;
 }
 
+void FFmpegStream::ApplyQueueSecsDirective(const char* text)
+{
+  // An optional second line, "queue_secs=<s>": the depth of Kodi's demux
+  // queue for this play, from the caller that writes the rate. A stream
+  // whose properties carried no queue_secs (a PVR add-on cannot know a
+  // setting a kofin session shortens) would otherwise report its position
+  // — and a pulse's shift — up to 8 s behind the packet Kodi is playing.
+  const char* directive = strstr(text, "queue_secs=");
+  if (!directive)
+    return;
+  const double secs = atof(directive + strlen("queue_secs="));
+  if (secs <= 0.0 || secs > 60.0 || std::abs(secs - m_queueSecs) < 0.01)
+    return;
+  Log(LOGLEVEL_INFO, "Tempo: queue_secs %.2f -> %.2f from the tempo file", m_queueSecs, secs);
+  m_queueSecs = secs;
+}
+
 void FFmpegStream::CheckTempoFileUpdate()
 {
   if (m_tempoFilePath.empty())
@@ -3466,6 +3587,8 @@ void FFmpegStream::CheckTempoFileUpdate()
     const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     fclose(f);
     buf[n] = '\0';
+
+    ApplyQueueSecsDirective(buf);
 
     const double newTempo = ParseTempo(buf);
     if (newTempo < 0.5 || newTempo > 100.0)

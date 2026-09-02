@@ -26,7 +26,7 @@ Set these properties on the ListItem you resolve (all keys are `inputstream.temp
 | --- | --- |
 | `inputstream` | `inputstream.tempo` |
 | `tempo` | Initial rate, e.g. `1.5`. Default `1.0`. |
-| `tempo_file` | A file the add-on polls every 250 ms for a new rate. Write the number, atomically (write a temp file, rename). One file per playing add-on — do not share another add-on's. |
+| `tempo_file` | A file the add-on polls every 250 ms for a new rate. Write the number, atomically (write a temp file, rename). One file per playing add-on — do not share another add-on's. An optional second line `queue_secs=<seconds>` sets the queue depth below for the running play, for a caller that knows it when the stream's properties could not. |
 | `start_time` | Audio-only items under PAPlayer: the resume position in seconds. Arms a hold that plays silence until PAPlayer's bookmark seek lands, so no audio from the start of the file leaks out first. Never set it for video — VideoPlayer seeks before any output starts. |
 | `queue_secs` | Depth of Kodi's demux queues in seconds, so time is reported at the playing point rather than the demux head: 8 on Kodi 21 (fixed), Kodi 22's *Audio/video queue time* setting (default 4). Default 8. |
 | `lead_secs` | Video items only: an optional add-on-side bound on how far output may run ahead of real time. 0 (default) leaves pacing to Kodi's queues. |
@@ -34,10 +34,12 @@ Set these properties on the ListItem you resolve (all keys are `inputstream.temp
 The add-on writes **`<tempo_file>.state`** back — one JSON line, replaced atomically, on every applied rate change, anchor and audio re-target:
 
 ```json
-{"seq": 7, "event": "tempo", "tempo": 1.0300, "content_ms": 88101.0, "output_ms": 87971.0, "delta_ms": 130.0, "queue_secs": 1.00, "video": true}
+{"seq": 7, "event": "tempo", "tempo": 1.0300, "content_ms": 88101.0, "output_ms": 87971.0, "delta_ms": 130.0, "queue_secs": 1.00, "video": true, "source_ms": 42731658.0, "player_ms": 88101.0}
 ```
 
 `seq` advancing with your rate in `tempo` is the confirmation that a write landed. `content_ms − output_ms` is the add-on's own account of how far a rate change has moved the position — it changes only while the rate is off 1.0, never at a seek or a flush — and `delta_ms` is the same quantity as last reported to Kodi, a queue depth behind.
+
+`source_ms` is the head's content position on the **source's own clock**: the container's timestamps before the add-on rebased them to the stream start (an MPEG-TS PTS on a broadcast). Every player of one live feed shares that clock whatever moment its own stream opened, which is what lets members of a group place themselves on a common timeline. `player_ms` is what Kodi's player clock reads for the same head packet, in whichever frame this stream reports time in, so a caller's own playing position on the source clock is `Player.getTime() + (source_ms − player_ms)`. ffmpeg unwraps the 33-bit PTS within a session, so `source_ms` can pass 2³³ ÷ 90 kHz (about 26.5 h); compare modulo that period. Both read −1 until the tempo pipeline has anchored.
 
 Every audio track is advertised to Kodi as PCM (the source codec stays in the OSD), because any of them may be the one Kodi selects; the pipeline follows Kodi's audio-track choice. **Audio passthrough is therefore off for the stream** — the receiver gets multichannel PCM. Switching the tempo file back to `1.0` does not restore passthrough; that needs the item to play without the add-on.
 
