@@ -29,6 +29,9 @@ TimeshiftStream::TimeshiftStream(IManageDemuxPacket* demuxPacketManager,
   std::random_device randomDevice; //Will be used to obtain a seed for the random number engine
   m_randomGenerator = std::mt19937(randomDevice()); //Standard mersenne_twister_engine seeded with randomDevice()
   m_randomDistribution = std::uniform_int_distribution<>(0, 1000);
+  // The input thread fills the buffer with raw packets; the tempo stage runs
+  // where Kodi reads them out (FFmpegStream.h, "Tempo at read-out").
+  m_tempoAtReadout = true;
 }
 
 TimeshiftStream::~TimeshiftStream()
@@ -51,10 +54,20 @@ bool TimeshiftStream::Open(const std::string& streamUrl, const std::string& mime
 
 DEMUX_PACKET* TimeshiftStream::DemuxRead()
 {
-  std::unique_lock<std::mutex> lock(m_mutex);
-  m_condition.wait_for(lock, std::chrono::milliseconds(10), [&] { return m_timeshiftBuffer.HasPacketAvailable(); });
+  if (TempoEnabled() && HasTempoOutput())
+    return PopTempoOutput();
 
-  return m_timeshiftBuffer.ReadPacket();
+  if (TempoEnabled())
+    PollTempoFile();
+
+  DEMUX_PACKET* packet;
+  {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_condition.wait_for(lock, std::chrono::milliseconds(10), [&] { return m_timeshiftBuffer.HasPacketAvailable(); });
+    packet = m_timeshiftBuffer.ReadPacket();
+  }
+
+  return TempoEnabled() ? ApplyTempoOnRead(packet) : packet;
 }
 
 bool TimeshiftStream::Start()
@@ -125,10 +138,17 @@ int64_t TimeshiftStream::LengthStream()
 
 bool TimeshiftStream::GetTimes(kodi::addon::InputstreamTimes& times)
 {
+  // The buffer's coordinates are content time (its index is the packets'
+  // own pts). With the tempo stage on the read-out side the clock Kodi runs
+  // is output time, so ptsStart = -Δ exactly as the base class does: the
+  // OSD, getTime() and the seek targets Kodi hands back all read content
+  // time, and the buffer's bounds are shifted by the same Δ to match.
+  const double delta = TempoEnabled() ? ReportedDeltaForTimes() : 0.0;
+
   times.SetStartTime(m_timeshiftBuffer.GetStartTimeSecs());
-  times.SetPtsStart(0);
-  times.SetPtsBegin(m_timeshiftBuffer.GetEarliestSegmentMillisecondsSinceStart() * 1000);
-  times.SetPtsEnd(m_timeshiftBuffer.GetMillisecondsSinceStart() * 1000);
+  times.SetPtsStart(-delta);
+  times.SetPtsBegin(m_timeshiftBuffer.GetEarliestSegmentMillisecondsSinceStart() * 1000 - delta);
+  times.SetPtsEnd(m_timeshiftBuffer.GetMillisecondsSinceStart() * 1000 - delta);
 
   return true;
 }
@@ -140,6 +160,20 @@ bool TimeshiftStream::IsRealTimeStream()
 
 bool TimeshiftStream::DemuxSeekTime(double timeMs, bool backwards, double& startpts)
 {
+  if (TempoEnabled())
+  {
+    // Kodi's demuxer seek arrives in its clock's domain — output time — and
+    // the buffer is indexed in content time.
+    const double deltaMs = CurrentDeltaMs();
+    if (deltaMs != 0.0)
+    {
+      Log(LOGLEVEL_DEBUG, "Tempo: timeshift seek target %.3fs is output-domain; +Δ %.3fs -> content %.3fs",
+          timeMs / 1000.0, deltaMs / 1000.0, (timeMs + deltaMs) / 1000.0);
+      timeMs += deltaMs;
+    }
+    FlushTempoForSeek();
+  }
+
   return m_timeshiftBuffer.Seek(timeMs);
 }
 

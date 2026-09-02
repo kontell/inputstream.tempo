@@ -115,6 +115,35 @@ public:
   std::shared_ptr<CurlInput> m_curlInput;
 
 protected:
+  // What Kodi's player clock reads for the packet at the demux head, in
+  // whichever frame this stream class reports time in — `player_ms` in the
+  // state line. Here GetTimes() reports ptsStart = -Δ (and the realtime
+  // IDisplayTime path stamps content dispTime), so the player clock runs in
+  // content time; a catchup stream reports ptsStart = 0 against its shifted
+  // output clock and overrides. A caller reads the source clock for its own
+  // playing position as Player.getTime() + (source_ms − player_ms).
+  virtual double HeadPlayerMs(double contentMs, double outputMs) const;
+  // ── Tempo at read-out ──
+  // A stream that fills a buffer from an input thread and serves Kodi from
+  // it (TimeshiftStream) runs the tempo stage where Kodi reads, not where
+  // the input thread demuxes: a rate change has to reach the packet Kodi is
+  // about to play rather than one it will consume when the buffer has
+  // drained, and the tempo file has to be polled at Kodi's read cadence, not
+  // at the source's segment cadence (measured on a live HLS: a pulse never
+  // confirmed). Such a class sets the flag; ReadNew() then stores raw
+  // content-domain packets and ApplyTempoOnRead() does on the way out what
+  // ReadNew() would have done on the way in.
+  bool m_tempoAtReadout = false;
+  bool TempoOnInput() const { return m_tempoEnabled && !m_tempoAtReadout; }
+  bool TempoEnabled() const { return m_tempoEnabled; }
+  bool HasTempoOutput() const { return !m_tempoOutputQueue.empty(); }
+  double CurrentDeltaMs() const;
+  DEMUX_PACKET* PopTempoOutput();
+  void PollTempoFile();
+  void FlushTempoForSeek();
+  double ReportedDeltaForTimes();
+  DEMUX_PACKET* ApplyTempoOnRead(DEMUX_PACKET* raw);
+  int64_t ToStreamTimestamp(double dvdTime, int den, int num) const;
   virtual std::string GetStreamCodecName(int iStreamId);
   virtual void CurrentPTSUpdated();
   bool IsPaused() { return m_speed == STREAM_PLAYSPEED_PAUSE; }
@@ -298,6 +327,14 @@ private:
   bool HasVideoStream() const;
   double QueueSecsForReadout() const;
   double CurrentDelta() const;
+  // The start ConvertTimestamp() subtracts: the container's own timestamps
+  // begin here. Added back to the head's content position it gives
+  // `source_ms` in the state line — the source's clock (an MPEG-TS PTS on
+  // a broadcast), which every member of a SyncPlay group playing one live
+  // feed shares whatever their own stream's start was. ffmpeg unwraps the
+  // 33-bit PTS within a session, so the value can pass 2^33/90kHz; the
+  // caller compares modulo that period.
+  double SourceStartSecs() const;
   void ResetTempoMapForSeek();
   void NoteOutputHead(double outputDts);
   void ProjectPacket(DEMUX_PACKET* pkt, int streamIdx);
@@ -311,6 +348,7 @@ private:
   void DestroyTempoProcessing();
   bool BuildFilterGraph(double tempo);
   void CheckTempoFileUpdate();
+  void ApplyQueueSecsDirective(const char* text);
   void ProcessAudioPacketWithTempo(AVPacket* pkt, AVStream* stream);
 };
 
