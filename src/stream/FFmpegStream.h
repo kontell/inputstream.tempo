@@ -146,6 +146,7 @@ protected:
   int64_t ToStreamTimestamp(double dvdTime, int den, int num) const;
   virtual std::string GetStreamCodecName(int iStreamId);
   virtual void CurrentPTSUpdated();
+  virtual void NormalizePacketTimestamps(AVPacket*, const AVStream*) {}
   bool IsPaused() { return m_speed == STREAM_PLAYSPEED_PAUSE; }
   virtual bool CheckReturnEmptyOnPacketResult(int result);
 

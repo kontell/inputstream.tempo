@@ -766,6 +766,8 @@ DEMUX_PACKET* FFmpegStream::ReadNew()
 
       if (pPacket)
       {
+        NormalizePacketTimestamps(&m_pkt.pkt, stream);
+
         // Tempo: route audio packets through decode+atempo pipeline
         if (TempoOnInput() && m_tempoAudioStreamIndex >= 0 &&
             m_pkt.pkt.stream_index == m_tempoAudioStreamIndex)

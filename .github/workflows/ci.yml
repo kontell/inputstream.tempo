@@ -85,6 +85,16 @@ jobs:
           echo "${app_id} ${{ github.workspace }}/${app_id}" \
             > xbmc/cmake/addons/addons/${app_id}/${app_id}.txt
 
+      - name: Timestamp and tempo map tests
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -S ${app_id}/tests -B ${app_id}/build-tests \
+            -DKODI_INCLUDE_DIR=${{ github.workspace }}/xbmc/xbmc/addons/kodi-dev-kit/include
+          cmake --build ${app_id}/build-tests
+          ctest --test-dir ${app_id}/build-tests --output-on-failure
+
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
@@ -348,4 +358,3 @@ jobs:
           retention-days: 14
           path: ${{ github.workspace }}/artifacts/*.zip
           if-no-files-found: error
-

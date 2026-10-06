@@ -40,6 +40,7 @@ set(TEMPO_HEADERS src/StreamManager.h
                   src/stream/BaseStream.h
                   src/stream/DemuxStream.h
                   src/stream/FFmpegCatchupStream.h
+                  src/stream/CatchupTimestampNormalizer.h
                   src/stream/FFmpegLog.h
                   src/stream/FFmpegStream.h
                   src/stream/TempoMap.h
