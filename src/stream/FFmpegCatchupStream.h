@@ -8,6 +8,7 @@
 #pragma once
 
 #include "FFmpegStream.h"
+#include "CatchupTimestampNormalizer.h"
 #include "../utils/HttpProxy.h"
 #include "../utils/TimeUtils.h"
 
@@ -44,7 +45,7 @@ public:
   double HeadPlayerMs(double contentMs, double outputMs) const override;
 
 protected:
-  void CurrentPTSUpdated() override;
+  void NormalizePacketTimestamps(AVPacket* packet, const AVStream* stream) override;
   bool CheckReturnEmptyOnPacketResult(int result) override;
 
   long long GetCurrentLiveOffset() { return std::time(nullptr) - m_catchupBufferStartTime; }
@@ -80,6 +81,7 @@ protected:
   double m_seekOffset;
   double m_pauseStartTime = 0;
   double m_currentDemuxTime = 0;
+  CatchupTimestampNormalizer m_timestampNormalizer;
 
   long long m_previousLiveBufferOffset = 0;
   bool m_lastSeekWasLive = false;

@@ -1,3 +1,7 @@
+v22.5.1
+- Forward catchup skips no longer jump hours backward after a stream timestamp reset
+- Normalize source timestamps before tempo processing and keep pause/resume and EOF continuation on the archive timeline
+
 v22.5.0
 - The state line now carries the head's position on the source's own clock (`source_ms`) and the player-clock reading for it (`player_ms`), so players of one live feed can place themselves on a shared timeline
 - The tempo file may carry a second line, `queue_secs=<seconds>`, for a caller that knows Kodi's queue depth when the stream's properties could not

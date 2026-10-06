@@ -66,6 +66,7 @@ FFmpegCatchupStream::~FFmpegCatchupStream()
 bool FFmpegCatchupStream::Open(const std::string& streamUrl, const std::string& mimeType, bool isRealTimeStream, const std::string& programProperty)
 {
   m_isOpeningStream = true;
+  m_timestampNormalizer.Reset();
   bool ret = FFmpegStream::Open(streamUrl, mimeType, isRealTimeStream, programProperty);
 
   m_lastPacketWasAvoidedEOF = false;
@@ -98,9 +99,14 @@ bool FFmpegCatchupStream::DemuxSeekTime(double timeMs, bool backwards, double& s
     if (!m_isOpeningStream)
     {
       DemuxReset();
-      return m_demuxResetOpenSuccess;
+      if (!m_demuxResetOpenSuccess)
+        return false;
     }
 
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    m_timestampNormalizer.Reset();
+    m_currentPts = 0;
+    m_currentDemuxTime = m_seekOffset / 1000;
     return true;
   }
 
@@ -115,8 +121,18 @@ DEMUX_PACKET* FFmpegCatchupStream::DemuxRead()
   if (pPacket)
   {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    pPacket->pts += m_seekOffset;
-    pPacket->dts += m_seekOffset;
+    if (pPacket->iSize > 0 && pPacket->iStreamId >= 0)
+    {
+      if (CatchupTimestampNormalizer::HasTimestamp(pPacket->pts))
+        pPacket->pts += m_seekOffset;
+      if (CatchupTimestampNormalizer::HasTimestamp(pPacket->dts))
+        pPacket->dts += m_seekOffset;
+
+      // The base class tracks normalized content time, including when audio
+      // passes through atempo. Output timestamps run at a different rate.
+      if (CatchupTimestampNormalizer::HasTimestamp(m_currentPts))
+        m_currentDemuxTime = (m_currentPts + m_seekOffset) / 1000;
+    }
 
     if (m_lastPacketResult == AVERROR_EOF && m_catchupTerminates && !m_isOpeningStream && !m_lastSeekWasLive)
     {
@@ -136,7 +152,6 @@ DEMUX_PACKET* FFmpegCatchupStream::DemuxRead()
       m_lastPacketWasAvoidedEOF = false;
     }
 
-    m_currentDemuxTime = static_cast<double>(pPacket->pts) / 1000;
   }
 
   return pPacket;
@@ -363,11 +378,34 @@ bool FFmpegCatchupStream::GetTimes(kodi::addon::InputstreamTimes& times)
   return true;
 }
 
-void FFmpegCatchupStream::CurrentPTSUpdated()
+void FFmpegCatchupStream::NormalizePacketTimestamps(AVPacket* packet, const AVStream* stream)
 {
-  FFmpegStream::CurrentPTSUpdated();
-  if (m_currentPts != STREAM_NOPTS_VALUE)
-    m_currentPts += m_seekOffset;
+  if (!m_pFormatContext || !(m_pFormatContext->iformat->flags & AVFMT_TS_DISCONT))
+    return;
+
+  // Correct source clocks before decoding audio or projecting video through
+  // the tempo map. Correcting the output packets would mix content and output
+  // time and leave the audio decoder's timestamp origin discontinuous.
+  const double noPts = static_cast<double>(STREAM_NOPTS_VALUE);
+  const double scale = av_q2d(stream->time_base) * STREAM_TIME_BASE;
+  double pts = packet->pts == AV_NOPTS_VALUE ? noPts : packet->pts * scale;
+  double dts = packet->dts == AV_NOPTS_VALUE ? noPts : packet->dts * scale;
+  const double originalPts = pts;
+  const double originalDts = dts;
+  const bool audioOrVideo = stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO ||
+                            stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO;
+  if (m_timestampNormalizer.Normalize(packet->stream_index, pts, dts,
+                                     packet->duration * scale, audioOrVideo))
+    Log(LOGLEVEL_DEBUG, "%s - Corrected catchup timestamp discontinuity", __FUNCTION__);
+
+  // Subtract only the correction, avoiding a round trip of unchanged PTS/DTS.
+  const AVRational microseconds = {1, STREAM_TIME_BASE};
+  if (packet->pts != AV_NOPTS_VALUE)
+    packet->pts -= av_rescale_q(static_cast<int64_t>(std::llround(originalPts - pts)),
+                               microseconds, stream->time_base);
+  if (packet->dts != AV_NOPTS_VALUE)
+    packet->dts -= av_rescale_q(static_cast<int64_t>(std::llround(originalDts - dts)),
+                               microseconds, stream->time_base);
 }
 
 double FFmpegCatchupStream::HeadPlayerMs(double contentMs, double outputMs) const
