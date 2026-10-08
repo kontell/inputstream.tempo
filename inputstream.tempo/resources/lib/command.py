@@ -23,3 +23,9 @@ command = sys.argv[1] if len(sys.argv) > 1 else ''
 if command in SPEED_COMMANDS:
     import speed
     speed.main(command)
+elif command == 'install_keymap':
+    import keymap
+    keymap.install()
+elif command == 'remove_keymap':
+    import keymap
+    keymap.remove()

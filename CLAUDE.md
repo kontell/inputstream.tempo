@@ -2,7 +2,7 @@
 
 Fork of `inputstream.ffmpegdirect` adding pitch-corrected playback speed via
 FFmpeg's `atempo` filter. Binary Kodi add-on (`kodi.inputstream`), plus a Python
-service for window properties, keymap install and notifications.
+service for window properties and notifications, and scripts for the speed keys.
 
 ## Kodi knowledge lives in kodi-drive
 
@@ -25,9 +25,10 @@ This file holds only what is specific to *this* add-on.
 | `src/stream/TempoMap.h` | the content↔output time map every stream is projected through (header-only; `tests/tempomap_test.cpp`) |
 | `src/StreamManager.cpp/.h` | entry point, property parsing, stream lifecycle |
 | `src/utils/Properties.h` | parsed ListItem properties |
-| `resources/lib/runner.py` | background service — window properties, keymap, notifications |
+| `resources/lib/runner.py` | background service — window properties, notifications, timeshift clean-up |
 | `resources/lib/command.py` | the one `RunScript(inputstream.tempo,<command>)` entry point — declared as the add-on's `xbmc.python.library` |
 | `resources/lib/speed.py` | keyboard/dialog speed control, run through `command.py` |
+| `resources/lib/keymap.py` | installs or removes the keymap in `userdata/keymaps`, only from the settings buttons and only after a confirmation — never from the service |
 
 ## Property contract
 

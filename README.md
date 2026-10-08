@@ -47,7 +47,7 @@ Resume for video goes through Kodi's normal `setResumePoint` path unchanged. HLS
 
 ## Keyboard control
 
-`resources/keymap.xml` binds **Page Up / Page Down** (one step faster/slower), **=** (back to 1.0×) and **S** (a picker dialog) while the add-on is active. The keys act only while the sentinel `special://temp/inputstream_tempo_active` exists — KoShelf writes it; a SyncPlay session never does, so the keys cannot change a group member's speed.
+`resources/keymap.xml` binds **Page Up / Page Down** (one step faster/slower), **=** (back to 1.0×) and **S** (a picker dialog) while the add-on is active. It is not installed automatically: choose **Install keyboard shortcuts** in the add-on's settings, which asks before copying the file to `special://userdata/keymaps/`. **Remove keyboard shortcuts** deletes it again. The keys act only while the sentinel `special://temp/inputstream_tempo_active` exists — KoShelf writes it; a SyncPlay session never does, so the keys cannot change a group member's speed.
 
 The sentinel also says which files the keys should act on, so that two add-ons using tempo do not write over each other's rate. Write `key=value` lines:
 

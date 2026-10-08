@@ -112,6 +112,36 @@
       </group>
     </category>
 
+    <!-- Keyboard shortcuts -->
+    <!-- A binary add-on's settings have no action callback, so each button is
+         a string setting whose button control runs the add-on's script. -->
+    <category id="keymap" label="30060" help="30660">
+      <group id="1" label="30060">
+        <setting id="installKeymap" type="string" label="30061" help="30661">
+          <level>0</level>
+          <default></default>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="button" format="action">
+            <data>RunScript(inputstream.tempo,install_keymap)</data>
+            <close>true</close>
+          </control>
+        </setting>
+        <setting id="removeKeymap" type="string" label="30062" help="30662">
+          <level>0</level>
+          <default></default>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="button" format="action">
+            <data>RunScript(inputstream.tempo,remove_keymap)</data>
+            <close>true</close>
+          </control>
+        </setting>
+      </group>
+    </category>
+
     <!-- Advanved -->
     <category id="advanced" label="30040" help="30640">
       <group id="1" label="30041">

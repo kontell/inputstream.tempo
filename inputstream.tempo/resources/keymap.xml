@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- inputstream.tempo keyboard shortcuts for playback-speed control.
-     Auto-installed to special://userdata/keymaps/inputstream.tempo.xml.
+     Copied to special://userdata/keymaps/inputstream.tempo.xml when the user
+     chooses "Install keyboard shortcuts" in the add-on's settings.
 
-     Only keys unbound in the default Kodi keyboard map are used, so defaults
-     (Up=SkipNext, Down=SkipPrevious, Menu=OSD, Backspace=Fullscreen, etc.)
-     are preserved. speed.py bails out silently unless the calling addon has
-     dropped special://temp/inputstream_tempo_active, so these keys are also
-     no-ops during non-tempo playback.
+     Kodi binds all four keys by default: Page Up and Page Down skip to the
+     next and previous item in fullscreen video and change the rating in the
+     visualisation, = is volume up and S opens the shutdown menu. In the
+     three windows below this keymap takes them over, and speed.py returns at
+     once unless a calling addon has dropped
+     special://temp/inputstream_tempo_active. So while no addon has armed
+     them, the keys do nothing in these windows. Other windows are untouched,
+     and so are Page Up and Page Down in live TV: Kodi looks in
+     FullscreenLiveTV, where they are channel up and down, before it looks
+     here. That is why the keymap is installed only on request.
 
      Keys:
        PgDn   speed down one step
