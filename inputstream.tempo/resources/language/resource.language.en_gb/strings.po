@@ -280,11 +280,16 @@ msgctxt "#30662"
 msgid "Delete the keymap file from the keymaps folder in Kodi's userdata. You are asked before anything is deleted."
 msgstr ""
 
-#empty strings from id 30663 to 30700
+#empty strings from id 30663 to 30699
 
 #. ##########
 #. dialogs #
 #. ##########
+
+#. heading of the speed-change notification and of the list of speeds
+msgctxt "#30700"
+msgid "Playback speed"
+msgstr ""
 
 #. confirmation shown before the keymap is installed
 msgctxt "#30701"

@@ -18,6 +18,7 @@ import json
 import sys
 import time
 
+import xbmcaddon
 import xbmcgui
 import xbmcvfs
 
@@ -30,6 +31,9 @@ NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
 # Sentinel written by the calling addon while tempo is the active inputstream.
 # Keys/dialog are no-ops if missing, so bindings don't affect non-tempo playback.
 ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
+
+# String id: the heading of the speed list.
+PLAYBACK_SPEED = 30700
 
 DEFAULT_STEP = 0.10
 DEFAULT_MIN = 0.5
@@ -123,7 +127,9 @@ def pick_via_dialog(current, lo, hi, step):
     labels = [format_speed(v) for v in values]
     # Preselect the nearest listed value.
     idx = min(range(len(values)), key=lambda i: abs(values[i] - current))
-    sel = xbmcgui.Dialog().select('Playback speed', labels, preselect=idx)
+    # Named by id: a keymap from an earlier version runs this file by path.
+    heading = xbmcaddon.Addon('inputstream.tempo').getLocalizedString(PLAYBACK_SPEED)
+    sel = xbmcgui.Dialog().select(heading, labels, preselect=idx)
     if sel < 0:
         return current
     return values[sel]

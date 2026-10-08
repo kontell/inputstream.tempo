@@ -22,6 +22,9 @@ TEMPO_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo')
 NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
 ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
 
+# String id: the heading of the speed notification.
+PLAYBACK_SPEED = 30700
+
 # Debounce: only emit notification after pending value is this old.
 # Rapid key presses keep bumping the timestamp, so only the final value shows.
 NOTIFY_DEBOUNCE = 0.35
@@ -111,8 +114,11 @@ def run():
                 with open(NOTIFY_FILE) as f:
                     ts_str, _, display = f.read().strip().partition('|')
                 if time.time() - float(ts_str) >= NOTIFY_DEBOUNCE:
-                    xbmc.executebuiltin(
-                        'Notification(Playback Speed, {}, 1200)'.format(display))
+                    # Quoted, so a comma in a translated heading is not read
+                    # as the end of the argument.
+                    heading = ADDON.getLocalizedString(PLAYBACK_SPEED)
+                    xbmc.executebuiltin('Notification("{}","{}",1200)'.format(
+                        heading.replace('"', ''), display.replace('"', '')))
                     os.remove(NOTIFY_FILE)
         except Exception:
             try:
