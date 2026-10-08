@@ -1,7 +1,7 @@
 # Kodi Media Center language file
-# Addon Name: Inputstream.ffmpegdirect
-# Addon id: inputstream.ffmpegdirect
-# Addon Provider: phunkyfish
+# Addon Name: Inputstream Tempo
+# Addon id: inputstream.tempo
+# Addon Provider: kontell
 msgid ""
 msgstr ""
 "Report-Msgid-Bugs-To: translations@kodi.tv\n"
@@ -16,12 +16,12 @@ msgstr ""
 "X-Generator: Weblate 5.16.1\n"
 
 msgctxt "Addon Summary"
-msgid "InputStream Client for FFmpeg streams (libavformat)"
-msgstr "FFmpeg 流的 InputStream 客户端（libavformat）"
+msgid "InputStream client with tempo control (pitch-corrected playback speed) for audio and video"
+msgstr ""
 
 msgctxt "Addon Description"
-msgid "InputStream Client for streams that can be opened by either FFmpeg's libavformat or Kodi's cURL. Common stream formats such as plain TS, HLS and DASH (without DRM) are supported as well as many others.[CR][CR]The addon also has support for Archive/Catchup services where there is a replay windows (usually in days) and can timeshift across that span.[CR][CR]For documenation visit: https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md"
-msgstr "InputStream 客户端，用于可通过 FFmpeg 的 libavformat 或 Kodi 的 cURL 打开的流。支持普通 TS、HLS 和 DASH（无DRM）等常见流格式以及其他许多格式。[CR][CR]该插件还支持有重播窗口（通常以天为单位）的归档/捕获服务，并可以在该时间跨度内进行时光平移。[CR][CR]相关文档请访问：https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md"
+msgid "InputStream client based on FFmpeg with built-in tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts, and rate-shifts video and subtitles in step with the audio so the same control works for video. Based on inputstream.ffmpegdirect."
+msgstr ""
 
 #. settings labels
 #. label-category: Network
@@ -187,8 +187,8 @@ msgstr "此部分包含时移的设置。时移允许您暂停直播电视，以
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "用于存储时移缓冲区的路径。默认值是 userdata 下的[I]“addon_data/inputstream.tempo/timeshift”[/I]文件夹。请注意，此文件夹将在 Kodi 启动时清除时移文件。仅当[I]“inputstream.ffmpegdirect.stream_mode=timeshift”[/I]属性传递给插件时才起作用。"
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.tempo.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "用于存储时移缓冲区的路径。默认值是 userdata 下的[I]“addon_data/inputstream.tempo/timeshift”[/I]文件夹。请注意，此文件夹将在 Kodi 启动时清除时移文件。仅当[I]“inputstream.tempo.stream_mode=timeshift”[/I]属性传递给插件时才起作用。"
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"
@@ -229,8 +229,8 @@ msgstr "启用此选项后，使用 FFmpeg 可以更快地打开具有清单文�
 
 #. help: Advanced - forceRealtimeOffCatchup
 msgctxt "#30645"
-msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
-msgstr "对于类似 HLS 的捕获流，报告实时流不是实时可以缩短流打开时间。如果测试此选项适用于捕获流/提供程序，则将[I]“#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false”[/I]添加到相关的M3U条目中。不应为所有流启用此设置。"
+msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.tempo.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
+msgstr "对于类似 HLS 的捕获流，报告实时流不是实时可以缩短流打开时间。如果测试此选项适用于捕获流/提供程序，则将[I]“#KODIPROP=inputstream.tempo.is_realtime_stream=false”[/I]添加到相关的M3U条目中。不应为所有流启用此设置。"
 
 #. help: Advanced - disableStrictHLSfileExtensionCheck
 msgctxt "#30646"

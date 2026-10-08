@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <settings version="1">
-  <section id="inputstream.ffmpegdirect">
+  <section id="inputstream.tempo">
 
     <!-- Timeshift -->
     <category id="timeshift" label="30020" help="30620">

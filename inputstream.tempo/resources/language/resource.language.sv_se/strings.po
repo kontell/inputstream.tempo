@@ -1,7 +1,7 @@
 # Kodi Media Center language file
-# Addon Name: Inputstream.ffmpegdirect
-# Addon id: inputstream.ffmpegdirect
-# Addon Provider: phunkyfish
+# Addon Name: Inputstream Tempo
+# Addon id: inputstream.tempo
+# Addon Provider: kontell
 msgid ""
 msgstr ""
 "Report-Msgid-Bugs-To: translations@kodi.tv\n"
@@ -16,12 +16,12 @@ msgstr ""
 "X-Generator: Weblate 5.16\n"
 
 msgctxt "Addon Summary"
-msgid "InputStream Client for FFmpeg streams (libavformat)"
-msgstr "InputStream-klient för FFmpeg-strömmar (libavformat)"
+msgid "InputStream client with tempo control (pitch-corrected playback speed) for audio and video"
+msgstr ""
 
 msgctxt "Addon Description"
-msgid "InputStream Client for streams that can be opened by either FFmpeg's libavformat or Kodi's cURL. Common stream formats such as plain TS, HLS and DASH (without DRM) are supported as well as many others.[CR][CR]The addon also has support for Archive/Catchup services where there is a replay windows (usually in days) and can timeshift across that span.[CR][CR]For documenation visit: https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md"
-msgstr "InputStream Klient för strömmar som kan öppnas av antingen FFmpegs libavformat eller Kodis cURL. Vanliga strömformat som vanlig TS, HLS och DASH (utan DRM) stöds liksom många andra.[CR][CR]Tillägget har också stöd för arkiv / catchup-tjänster där det finns ett uppspelningsfönster (vanligtvis i dagar) och kan tidsförskjutas över det spannet.[CR][CR]För dokumentation besök: https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md"
+msgid "InputStream client based on FFmpeg with built-in tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts, and rate-shifts video and subtitles in step with the audio so the same control works for video. Based on inputstream.ffmpegdirect."
+msgstr ""
 
 #. settings labels
 #. label-category: Network
@@ -187,8 +187,8 @@ msgstr "Den här kategorin innehåller inställningar för tidsförskjutning. Ti
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "Den sökväg som används för att lagra bufferten för tidsförskjutning. Standard är mappen [I]”addon_data/inputstream.tempo/timeshift”[/I] i userdata. Observera att den här mappen rensas från filer med tidsförskjutning när Kodi startas. Endast relevant när egenskapen [I]”inputstream.ffmpegdirect.stream_mode=timeshift”[/I] skickas till tillägget."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.tempo.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "Den sökväg som används för att lagra bufferten för tidsförskjutning. Standard är mappen [I]”addon_data/inputstream.tempo/timeshift”[/I] i userdata. Observera att den här mappen rensas från filer med tidsförskjutning när Kodi startas. Endast relevant när egenskapen [I]”inputstream.tempo.stream_mode=timeshift”[/I] skickas till tillägget."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"
@@ -229,8 +229,8 @@ msgstr "Strömmar som har en manifestfil (t.ex. HLD/DASH/Smooth Streaming) kan �
 
 #. help: Advanced - forceRealtimeOffCatchup
 msgctxt "#30645"
-msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
-msgstr "För vissa catchup-strömmar som HLS kan rapportering om att en live-ström inte är live förbättra strömmens öppningstider. Om du testar det här alternativet för en catchup-ström/leverantör, lägg då till en [I]”#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false”[/I] till M3U-posten i fråga. Den här inställningen bör inte vara aktiverad för alla strömmar."
+msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.tempo.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
+msgstr "För vissa catchup-strömmar som HLS kan rapportering om att en live-ström inte är live förbättra strömmens öppningstider. Om du testar det här alternativet för en catchup-ström/leverantör, lägg då till en [I]”#KODIPROP=inputstream.tempo.is_realtime_stream=false”[/I] till M3U-posten i fråga. Den här inställningen bör inte vara aktiverad för alla strömmar."
 
 #. help: Advanced - disableStrictHLSfileExtensionCheck
 msgctxt "#30646"

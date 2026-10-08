@@ -1,16 +1,17 @@
-Source: kodi-inputstream-ffmpegdirect
+Source: kodi-inputstream-tempo
 Priority: extra
-Maintainer: Ross Nicholson <phunkyfish@gmail.com>
+Maintainer: Kontell <91025994+kontell@users.noreply.github.com>
 Build-Depends: debhelper (>= 10.0.0), cmake, kodi-addon-dev, kodi-ffmpeg-dev,
                libbz2-dev, libz3-dev, pkg-config, yasm, zlib1g-dev
 Standards-Version: 4.0.0
 Section: libs
-Homepage: <https://kodi.tv>
+Homepage: https://github.com/kontell/inputstream.tempo
 
-Package: kodi-inputstream-ffmpegdirect
+Package: kodi-inputstream-tempo
 Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: FFmpegDirect inputstream addon for Kodi
- This is the FFmpegDirect inputstream addon for Kodi for streams opened by libavformat
+Description: Tempo inputstream addon for Kodi
+ FFmpeg-based inputstream addon for Kodi with pitch-corrected playback speed.
+ Based on inputstream.ffmpegdirect.
 

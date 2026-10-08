@@ -63,14 +63,14 @@ InputStreamFFmpegDirect::~InputStreamFFmpegDirect()
 
 bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props)
 {
-  Log(LOGLEVEL_INFO, "inputstream.ffmpegdirect: OpenStream() - Num Props: %d", props.GetPropertiesAmount());
+  Log(LOGLEVEL_INFO, "inputstream.tempo: OpenStream() - Num Props: %d", props.GetPropertiesAmount());
 
   for (const auto& prop : props.GetProperties())
   {
     if (StringUtils::StartsWith(prop.second, "http://") || StringUtils::StartsWith(prop.second, "https://"))
-      Log(LOGLEVEL_INFO, "inputstream.ffmpegdirect property: %s = %s", prop.first.c_str(), CURL::GetRedacted(prop.second).c_str());
+      Log(LOGLEVEL_INFO, "inputstream.tempo property: %s = %s", prop.first.c_str(), CURL::GetRedacted(prop.second).c_str());
     else
-      Log(LOGLEVEL_INFO, "inputstream.ffmpegdirect property: %s = %s", prop.first.c_str(), prop.second.c_str());
+      Log(LOGLEVEL_INFO, "inputstream.tempo property: %s = %s", prop.first.c_str(), prop.second.c_str());
 
     if (PROGRAM_NUMBER == prop.first)
     {
@@ -311,7 +311,7 @@ void InputStreamFFmpegDirect::DemuxSetSpeed(int speed)
 
 void InputStreamFFmpegDirect::SetVideoResolution(unsigned int width, unsigned int height)
 {
-  Log(LOGLEVEL_DEBUG, "inputstream.ffmpegdirect: SetVideoResolution()");
+  Log(LOGLEVEL_DEBUG, "inputstream.tempo: SetVideoResolution()");
 
   m_videoWidth = width;
   m_videoHeight = height;

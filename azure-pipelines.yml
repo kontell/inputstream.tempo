@@ -1,5 +1,5 @@
 variables:
-  app_id: 'inputstream.ffmpegdirect'
+  app_id: 'inputstream.tempo'
 
 trigger:
   branches:
