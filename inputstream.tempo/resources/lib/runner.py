@@ -101,7 +101,7 @@ def run():
     win = xbmcgui.Window(10000)
     was_playing = False
 
-    xbmc.log('inputstream.tempo: service started', xbmc.LOGINFO)
+    xbmc.log('inputstream.tempo: service started', xbmc.LOGDEBUG)
 
     while not monitor.abortRequested():
         if monitor.waitForAbort(0.2):
@@ -145,7 +145,7 @@ def run():
             win.clearProperty('InputstreamTempo.Active')
             was_playing = False
 
-    xbmc.log('inputstream.tempo: service stopped', xbmc.LOGINFO)
+    xbmc.log('inputstream.tempo: service stopped', xbmc.LOGDEBUG)
 
 
 if __name__ == '__main__':
