@@ -26,7 +26,8 @@ This file holds only what is specific to *this* add-on.
 | `src/StreamManager.cpp/.h` | entry point, property parsing, stream lifecycle |
 | `src/utils/Properties.h` | parsed ListItem properties |
 | `resources/lib/runner.py` | background service — window properties, keymap, notifications |
-| `resources/lib/speed.py` | `RunScript` handler for keyboard/dialog speed control |
+| `resources/lib/command.py` | the one `RunScript(inputstream.tempo,<command>)` entry point — declared as the add-on's `xbmc.python.library` |
+| `resources/lib/speed.py` | keyboard/dialog speed control, run through `command.py` |
 
 ## Property contract
 

@@ -1,4 +1,4 @@
-"""Speed control commands for inputstream.tempo. Called via RunScript.
+"""Speed control commands for inputstream.tempo. Run through command.py.
 
 Commands:
     speed_up     bump tempo by one step, clamped to max
@@ -138,11 +138,10 @@ def queue_notification(display):
         pass
 
 
-if __name__ == '__main__':
+def main(cmd):
     if not os.path.exists(ACTIVE_FILE):
-        sys.exit(0)
+        return
 
-    cmd = sys.argv[1] if len(sys.argv) > 1 else ''
     tempo_file, config_file = resolve_files()
     step, lo, hi = read_config(config_file)
     current = read_tempo(tempo_file)
@@ -158,3 +157,8 @@ if __name__ == '__main__':
         write_tempo(new_speed, tempo_file)
         set_props(new_speed)
         queue_notification(format_speed(new_speed))
+
+
+if __name__ == '__main__':
+    # A keymap installed by an earlier version runs this file by its path.
+    main(sys.argv[1] if len(sys.argv) > 1 else '')
