@@ -1,3 +1,9 @@
+#  Copyright (C) 2005-2021 Team Kodi (https://kodi.tv)
+#  Copyright (C) 2026 kontell
+#
+#  SPDX-License-Identifier: GPL-2.0-or-later
+#  See LICENSE.md for more information.
+
 """inputstream.tempo background service.
 
 Updates Window(Home) properties with current playback speed so skins can

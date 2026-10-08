@@ -1,3 +1,8 @@
+#  Copyright (C) 2026 kontell
+#
+#  SPDX-License-Identifier: GPL-2.0-or-later
+#  See LICENSE.md for more information.
+
 """Speed control commands for inputstream.tempo. Run through command.py.
 
 Commands:
