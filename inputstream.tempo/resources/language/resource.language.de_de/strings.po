@@ -187,8 +187,8 @@ msgstr "Diese Kategorie enthält Einstellungen für Timeshifting. Mit Timeshifti
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "Der Pfad zum Speichern des Timeshift-Puffers. Der Standardwert ist der Ordner [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] in den Benutzerdaten. Beachten Sie, dass dieser Ordner beim Kodi-Start von Timeshift-Dateien befreit wird. Nur relevant, wenn der Parameter [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] an das Addon übergeben wird."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "Der Pfad zum Speichern des Timeshift-Puffers. Der Standardwert ist der Ordner [I]\"addon_data/inputstream.tempo/timeshift\"[/I] in den Benutzerdaten. Beachten Sie, dass dieser Ordner beim Kodi-Start von Timeshift-Dateien befreit wird. Nur relevant, wenn der Parameter [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] an das Addon übergeben wird."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"

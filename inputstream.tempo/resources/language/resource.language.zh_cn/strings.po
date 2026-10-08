@@ -187,8 +187,8 @@ msgstr "此部分包含时移的设置。时移允许您暂停直播电视，以
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "用于存储时移缓冲区的路径。默认值是 userdata 下的[I]“addon_data/inputstream.ffmpegdirect/timeshift”[/I]文件夹。请注意，此文件夹将在 Kodi 启动时清除时移文件。仅当[I]“inputstream.ffmpegdirect.stream_mode=timeshift”[/I]属性传递给插件时才起作用。"
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "用于存储时移缓冲区的路径。默认值是 userdata 下的[I]“addon_data/inputstream.tempo/timeshift”[/I]文件夹。请注意，此文件夹将在 Kodi 启动时清除时移文件。仅当[I]“inputstream.ffmpegdirect.stream_mode=timeshift”[/I]属性传递给插件时才起作用。"
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"

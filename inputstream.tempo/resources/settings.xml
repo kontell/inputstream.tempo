@@ -7,7 +7,7 @@
       <group id="1" label="30020">
         <setting id="timeshiftBufferPath" type="path" label="30021" help="30621">
           <level>0</level>
-          <default>special://userdata/addon_data/inputstream.ffmpegdirect/timeshift</default>
+          <default>special://userdata/addon_data/inputstream.tempo/timeshift</default>
           <constraints>
             <allowempty>true</allowempty>
             <writable>true</writable>

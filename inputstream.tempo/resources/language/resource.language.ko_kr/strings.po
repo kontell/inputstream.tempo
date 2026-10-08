@@ -187,8 +187,8 @@ msgstr "이 범주에는 시간이동에 대한 설정이 포함되어 있습니
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "시간이동 버퍼를 저장하는 데 사용되는 경로입니다. 기본값은 userdata의 [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] 폴더입니다. 이 폴더는 Kodi 시작 시 시간이동 파일에서 지워집니다. [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] 속성이 애드온에 전달된 경우에만 관련이 있습니다."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "시간이동 버퍼를 저장하는 데 사용되는 경로입니다. 기본값은 userdata의 [I]\"addon_data/inputstream.tempo/timeshift\"[/I] 폴더입니다. 이 폴더는 Kodi 시작 시 시간이동 파일에서 지워집니다. [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] 속성이 애드온에 전달된 경우에만 관련이 있습니다."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"

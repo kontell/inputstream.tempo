@@ -187,8 +187,8 @@ msgstr "Tämä luokka sisältää ajansiirron asetukset. Ajansiirto mahdollistaa
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "Ajansiirtopuskurin tallennussijainti. Oletus on [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] Kodi-asennuksen \"userdata\" -kansiossa. Huomioi, että kansio tyhjennetään ajansiirtotiedostoista Kodin käynnistyksen yhteydessä. Olennainen vain silloin, kun lisäosalle välitetään [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I]-tietue."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "Ajansiirtopuskurin tallennussijainti. Oletus on [I]\"addon_data/inputstream.tempo/timeshift\"[/I] Kodi-asennuksen \"userdata\" -kansiossa. Huomioi, että kansio tyhjennetään ajansiirtotiedostoista Kodin käynnistyksen yhteydessä. Olennainen vain silloin, kun lisäosalle välitetään [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I]-tietue."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"

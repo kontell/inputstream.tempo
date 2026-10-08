@@ -187,8 +187,8 @@ msgstr "Cette catégorie contient les paramètres du contrôle du direct. Le con
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "Le chemin utilisé pour stocker le tampon du contrôle du direct. La valeur par défaut est le dossier [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] dans userdata. Notez que ce dossier sera vidé des fichiers du différé au démarrage de Kodi. Uniquement lorsque la propriété [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] est transmise à l'addon."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "Le chemin utilisé pour stocker le tampon du contrôle du direct. La valeur par défaut est le dossier [I]\"addon_data/inputstream.tempo/timeshift\"[/I] dans userdata. Notez que ce dossier sera vidé des fichiers du différé au démarrage de Kodi. Uniquement lorsque la propriété [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] est transmise à l'addon."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"

@@ -22,7 +22,7 @@
 namespace ffmpegdirect
 {
 
-static const std::string DEFAULT_TIMESHIFT_BUFFER_PATH = "special://userdata/addon_data/inputstream.ffmpegdirect/timeshift";
+static const std::string DEFAULT_TIMESHIFT_BUFFER_PATH = "special://userdata/addon_data/inputstream.tempo/timeshift";
 
 class TimeshiftSegment
 {

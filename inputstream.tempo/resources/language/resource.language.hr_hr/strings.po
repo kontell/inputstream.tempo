@@ -187,8 +187,8 @@ msgstr "Ova kategorija sadrži postavke za vremensko premotavanje. Vremensko pre
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "Putanja korištena za međuspremnik vremenskog premotavanja. Zadana je [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] mapa u userdata mapi. Zapamtite da će iz te mape biti uklonjene  datoteke vremenskog premotavanja pri Kodi pokretanju. Bitno je samo kada [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] svojstvo je proslijeđeno u dodatak."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "Putanja korištena za međuspremnik vremenskog premotavanja. Zadana je [I]\"addon_data/inputstream.tempo/timeshift\"[/I] mapa u userdata mapi. Zapamtite da će iz te mape biti uklonjene  datoteke vremenskog premotavanja pri Kodi pokretanju. Bitno je samo kada [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] svojstvo je proslijeđeno u dodatak."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"
