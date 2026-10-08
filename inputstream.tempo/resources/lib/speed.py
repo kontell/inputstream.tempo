@@ -23,6 +23,7 @@ import json
 import sys
 import time
 
+import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcvfs
@@ -39,6 +40,11 @@ ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
 
 # String id: the heading of the speed list.
 PLAYBACK_SPEED = 30700
+
+# Where a rate file may live: Kodi's temp folder, which is where callers put
+# it, or an add-on's data folder. The demuxer holds the tempo_file property to
+# the same two folders (IsAllowedTempoFile in StreamManager.cpp).
+ALLOWED_ROOTS = ('special://temp/', 'special://profile/addon_data/')
 
 DEFAULT_STEP = 0.10
 DEFAULT_MIN = 0.5
@@ -69,6 +75,20 @@ def resolve_files():
     if not tempo_file:
         return TEMPO_FILE, CONFIG_FILE
     return tempo_file, fields.get('config_file') or CONFIG_FILE
+
+
+def is_allowed(path):
+    """True when path is inside one of ALLOWED_ROOTS, with links followed.
+
+    The sentinel is a file any add-on can write, and the speed keys replace
+    the file it names, so that name must not be free to point anywhere.
+    """
+    real = os.path.normcase(os.path.realpath(path))
+    for root in ALLOWED_ROOTS:
+        base = os.path.normcase(os.path.realpath(xbmcvfs.translatePath(root)))
+        if real.startswith(base + os.sep):
+            return True
+    return False
 
 
 def read_config(config_file=CONFIG_FILE):
@@ -154,6 +174,10 @@ def main(cmd):
         return
 
     tempo_file, config_file = resolve_files()
+    if not is_allowed(tempo_file):
+        xbmc.log('inputstream.tempo: speed key ignored, the tempo file is outside '
+                 "Kodi's temp and add-on data folders: {}".format(tempo_file), xbmc.LOGWARNING)
+        return
     step, lo, hi = read_config(config_file)
     current = read_tempo(tempo_file)
 

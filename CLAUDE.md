@@ -25,6 +25,7 @@ This file holds only what is specific to *this* add-on.
 | `src/stream/TempoMap.h` | the content↔output time map every stream is projected through (header-only; `tests/tempomap_test.cpp`) |
 | `src/StreamManager.cpp/.h` | entry point, property parsing, stream lifecycle |
 | `src/utils/Properties.h` | parsed ListItem properties |
+| `src/utils/PathInside.h` | textual is-this-path-inside-that-folder check (header-only; `tests/pathinside_test.cpp`) |
 | `resources/lib/runner.py` | background service — window properties, notifications, timeshift clean-up |
 | `resources/lib/command.py` | the one `RunScript(inputstream.tempo,<command>)` entry point — declared as the add-on's `xbmc.python.library` |
 | `resources/lib/speed.py` | keyboard/dialog speed control, run through `command.py` |
@@ -37,7 +38,7 @@ Set on the ListItem by the calling add-on:
 | Property | |
 |---|---|
 | `inputstream.tempo.tempo` | initial speed, e.g. `1.5` |
-| `inputstream.tempo.tempo_file` | path polled for live tempo changes (atomic write) |
+| `inputstream.tempo.tempo_file` | path polled for live tempo changes (atomic write). Must lie in `special://temp/` or `special://profile/addon_data/` — `IsAllowedTempoFile` refuses anything else, as the property can come from a playlist and the add-on writes `.state` beside it; `speed.py` holds the sentinel's `tempo_file` to the same folders |
 | `inputstream.tempo.start_time` | resume position in seconds — pre-sets `m_currentPts` for `GetTime()` **and** arms the initial seek hold (audio-only items; never for video) |
 | `inputstream.tempo.queue_secs` | depth of Kodi's demux queues in seconds: 8 on Omega (hard-coded), Kodi 22's `videoplayer.queuetimesize` on Piers (default 4). Time is reported this far behind the demux head. Default 8 |
 | `inputstream.tempo.lead_secs` | optional add-on-side lead bound for video items; 0 (default) leaves pacing to Kodi's queues |

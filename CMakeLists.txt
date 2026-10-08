@@ -53,6 +53,7 @@ set(TEMPO_HEADERS src/StreamManager.h
                   src/utils/DiskUtils.h
                   src/utils/FilenameUtils.h
                   src/utils/Log.h
+                  src/utils/PathInside.h
                   src/utils/Properties.h
                   src/utils/TimeUtils.h
                   src/stream/url/URL.h
