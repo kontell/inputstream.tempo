@@ -1,7 +1,7 @@
 # Kodi Media Center language file
-# Addon Name: Inputstream.ffmpegdirect
-# Addon id: inputstream.ffmpegdirect
-# Addon Provider: phunkyfish
+# Addon Name: Inputstream Tempo
+# Addon id: inputstream.tempo
+# Addon Provider: kontell
 
 msgid ""
 msgstr ""
@@ -13,11 +13,11 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgctxt "Addon Summary"
-msgid "InputStream Client for FFmpeg streams (libavformat)"
+msgid "InputStream client with tempo control (pitch-corrected playback speed) for audio and video"
 msgstr ""
 
 msgctxt "Addon Description"
-msgid "InputStream Client for streams that can be opened by either FFmpeg's libavformat or Kodi's cURL. Common stream formats such as plain TS, HLS and DASH (without DRM) are supported as well as many others.[CR][CR]The addon also has support for Archive/Catchup services where there is a replay windows (usually in days) and can timeshift across that span.[CR][CR]For documenation visit: https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md"
+msgid "InputStream client based on FFmpeg with built-in tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts, and rate-shifts video and subtitles in step with the audio so the same control works for video. Based on inputstream.ffmpegdirect."
 msgstr ""
 
 #. settings labels
@@ -138,7 +138,25 @@ msgctxt "#30047"
 msgid "Disable strict HLS file extension check"
 msgstr ""
 
-# empty strings from id 30048 to 30599
+#empty strings from id 30048 to 30059
+
+#. label-category: keymap
+#. label-group: Keyboard shortcuts - Keyboard shortcuts
+msgctxt "#30060"
+msgid "Keyboard shortcuts"
+msgstr ""
+
+#. label: Keyboard shortcuts - installKeymap
+msgctxt "#30061"
+msgid "Install keyboard shortcuts"
+msgstr ""
+
+#. label: Keyboard shortcuts - removeKeymap
+msgctxt "#30062"
+msgid "Remove keyboard shortcuts"
+msgstr ""
+
+# empty strings from id 30063 to 30599
 #. ############
 #. help info #
 #. ############
@@ -191,7 +209,7 @@ msgstr ""
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.tempo.stream_mode=timeshift\"[/I] property is passed to the addon."
 msgstr ""
 
 #. help: Timeshift - timeshiftEnableLimit
@@ -235,10 +253,70 @@ msgstr ""
 
 #. help: Advanced - forceRealtimeOffCatchup
 msgctxt "#30645"
-msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
+msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.tempo.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
 msgstr ""
 
 #. help: Advanced - disableStrictHLSfileExtensionCheck
 msgctxt "#30646"
 msgid "Allows playing HLS streams without file extension or with unsupported file extension. This lowers the security requirements in ffmpeg."
+msgstr ""
+
+#empty strings from id 30647 to 30659
+
+#. help info - Keyboard shortcuts
+
+#. help-category: keymap
+msgctxt "#30660"
+msgid "Optional keys for changing the playback speed during playback that uses this add-on. Page Up and Page Down change the speed by one step, = returns to normal speed and S opens a list of speeds. During fullscreen playback they replace what Kodi uses those keys for, so they are installed only if you choose to."
+msgstr ""
+
+#. help: Keyboard shortcuts - installKeymap
+msgctxt "#30661"
+msgid "Copy the keymap file to the keymaps folder in Kodi's userdata. You are asked before anything is written."
+msgstr ""
+
+#. help: Keyboard shortcuts - removeKeymap
+msgctxt "#30662"
+msgid "Delete the keymap file from the keymaps folder in Kodi's userdata. You are asked before anything is deleted."
+msgstr ""
+
+#empty strings from id 30663 to 30699
+
+#. ##########
+#. dialogs #
+#. ##########
+
+#. heading of the speed-change notification and of the list of speeds
+msgctxt "#30700"
+msgid "Playback speed"
+msgstr ""
+
+#. confirmation shown before the keymap is installed
+msgctxt "#30701"
+msgid "This copies the file inputstream.tempo.xml to the keymaps folder in Kodi's userdata. During fullscreen playback, Page Up, Page Down, = and S will then change the playback speed in place of what Kodi uses them for. Continue?"
+msgstr ""
+
+#. confirmation shown before the keymap is removed
+msgctxt "#30702"
+msgid "This deletes the file inputstream.tempo.xml from the keymaps folder in Kodi's userdata. The four keys go back to what Kodi uses them for. Continue?"
+msgstr ""
+
+#. notification: the keymap was installed
+msgctxt "#30703"
+msgid "Keyboard shortcuts installed"
+msgstr ""
+
+#. notification: the keymap was removed
+msgctxt "#30704"
+msgid "Keyboard shortcuts removed"
+msgstr ""
+
+#. notification: remove was chosen but there is no keymap file
+msgctxt "#30705"
+msgid "Keyboard shortcuts are not installed"
+msgstr ""
+
+#. notification: the keymap file could not be written or deleted
+msgctxt "#30706"
+msgid "The keymap file could not be changed. See the Kodi log."
 msgstr ""

@@ -201,7 +201,7 @@ FFmpegStream::~FFmpegStream()
 
 bool FFmpegStream::Open(const std::string& streamUrl, const std::string& mimeType, bool isRealTimeStream, const std::string& programProperty)
 {
-  Log(LOGLEVEL_DEBUG, "inputstream.ffmpegdirect: OpenStream()");
+  Log(LOGLEVEL_DEBUG, "inputstream.tempo: OpenStream()");
 
   m_streamUrl = streamUrl;
   m_mimeType = mimeType;

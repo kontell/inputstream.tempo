@@ -26,7 +26,7 @@ Set these properties on the ListItem you resolve (all keys are `inputstream.temp
 | --- | --- |
 | `inputstream` | `inputstream.tempo` |
 | `tempo` | Initial rate, e.g. `1.5`. Default `1.0`. |
-| `tempo_file` | A file the add-on polls every 250 ms for a new rate. Write the number, atomically (write a temp file, rename). One file per playing add-on — do not share another add-on's. An optional second line `queue_secs=<seconds>` sets the queue depth below for the running play, for a caller that knows it when the stream's properties could not. |
+| `tempo_file` | A file the add-on polls every 250 ms for a new rate. Write the number, atomically (write a temp file, rename). One file per playing add-on — do not share another add-on's. It must be an absolute path inside `special://temp/` or `special://profile/addon_data/` (pass it through `translatePath`); a path anywhere else, or one containing `..`, is ignored and logged. An optional second line `queue_secs=<seconds>` sets the queue depth below for the running play, for a caller that knows it when the stream's properties could not. |
 | `start_time` | Audio-only items under PAPlayer: the resume position in seconds. Arms a hold that plays silence until PAPlayer's bookmark seek lands, so no audio from the start of the file leaks out first. Never set it for video — VideoPlayer seeks before any output starts. |
 | `queue_secs` | Depth of Kodi's demux queues in seconds, so time is reported at the playing point rather than the demux head: 8 on Kodi 21 (fixed), Kodi 22's *Audio/video queue time* setting (default 4). Default 8. |
 | `lead_secs` | Video items only: an optional add-on-side bound on how far output may run ahead of real time. 0 (default) leaves pacing to Kodi's queues. |
@@ -47,7 +47,7 @@ Resume for video goes through Kodi's normal `setResumePoint` path unchanged. HLS
 
 ## Keyboard control
 
-`resources/keymap.xml` binds **Page Up / Page Down** (one step faster/slower), **=** (back to 1.0×) and **S** (a picker dialog) while the add-on is active. The keys act only while the sentinel `special://temp/inputstream_tempo_active` exists — KoShelf writes it; a SyncPlay session never does, so the keys cannot change a group member's speed.
+`resources/keymap.xml` binds **Page Up / Page Down** (one step faster/slower), **=** (back to 1.0×) and **S** (a picker dialog) while the add-on is active. It is not installed automatically: choose **Install keyboard shortcuts** in the add-on's settings, which asks before copying the file to `special://userdata/keymaps/`. **Remove keyboard shortcuts** deletes it again. The keys act only while the sentinel `special://temp/inputstream_tempo_active` exists — KoShelf writes it; a SyncPlay session never does, so the keys cannot change a group member's speed.
 
 The sentinel also says which files the keys should act on, so that two add-ons using tempo do not write over each other's rate. Write `key=value` lines:
 

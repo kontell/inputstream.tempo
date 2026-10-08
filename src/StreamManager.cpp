@@ -12,11 +12,30 @@
 #include "stream/url/URL.h"
 #include "utils/HttpProxy.h"
 #include "utils/Log.h"
+#include "utils/PathInside.h"
 
+#include <kodi/Filesystem.h>
 #include <kodi/tools/StringUtils.h>
 
 using namespace ffmpegdirect;
 using namespace kodi::tools;
+
+namespace
+{
+
+// Where a caller may keep the tempo file it names: Kodi's temp folder, which
+// is where callers put it, or an add-on's data folder.
+bool IsAllowedTempoFile(const std::string& path)
+{
+  for (const char* root : {"special://temp/", "special://profile/addon_data/"})
+  {
+    if (IsPathInside(path, kodi::vfs::TranslateSpecialProtocol(root)))
+      return true;
+  }
+  return false;
+}
+
+} // unnamed namespace
 
 /***********************************************************
 * InputSteam Client AddOn specific public library functions
@@ -63,14 +82,14 @@ InputStreamFFmpegDirect::~InputStreamFFmpegDirect()
 
 bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props)
 {
-  Log(LOGLEVEL_INFO, "inputstream.ffmpegdirect: OpenStream() - Num Props: %d", props.GetPropertiesAmount());
+  Log(LOGLEVEL_INFO, "inputstream.tempo: OpenStream() - Num Props: %d", props.GetPropertiesAmount());
 
   for (const auto& prop : props.GetProperties())
   {
     if (StringUtils::StartsWith(prop.second, "http://") || StringUtils::StartsWith(prop.second, "https://"))
-      Log(LOGLEVEL_INFO, "inputstream.ffmpegdirect property: %s = %s", prop.first.c_str(), CURL::GetRedacted(prop.second).c_str());
+      Log(LOGLEVEL_INFO, "inputstream.tempo property: %s = %s", prop.first.c_str(), CURL::GetRedacted(prop.second).c_str());
     else
-      Log(LOGLEVEL_INFO, "inputstream.ffmpegdirect property: %s = %s", prop.first.c_str(), prop.second.c_str());
+      Log(LOGLEVEL_INFO, "inputstream.tempo property: %s = %s", prop.first.c_str(), prop.second.c_str());
 
     if (PROGRAM_NUMBER == prop.first)
     {
@@ -160,7 +179,12 @@ bool InputStreamFFmpegDirect::Open(const kodi::addon::InputstreamProperty& props
     }
     else if (AUDIO_TEMPO_FILE == prop.first)
     {
-      m_properties.m_tempoFilePath = prop.second;
+      // The stream polls this file and writes a state file beside it, and a
+      // property can arrive from a playlist as well as from an add-on.
+      if (IsAllowedTempoFile(prop.second))
+        m_properties.m_tempoFilePath = prop.second;
+      else
+        Log(LOGLEVEL_ERROR, "inputstream.tempo: tempo_file ignored, it is outside Kodi's temp and add-on data folders: %s", prop.second.c_str());
     }
     else if (AUDIO_START_TIME == prop.first)
     {
@@ -311,7 +335,7 @@ void InputStreamFFmpegDirect::DemuxSetSpeed(int speed)
 
 void InputStreamFFmpegDirect::SetVideoResolution(unsigned int width, unsigned int height)
 {
-  Log(LOGLEVEL_DEBUG, "inputstream.ffmpegdirect: SetVideoResolution()");
+  Log(LOGLEVEL_DEBUG, "inputstream.tempo: SetVideoResolution()");
 
   m_videoWidth = width;
   m_videoHeight = height;

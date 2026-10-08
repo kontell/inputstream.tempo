@@ -1,4 +1,9 @@
-"""Speed control commands for inputstream.tempo. Called via RunScript.
+#  Copyright (C) 2026 kontell
+#
+#  SPDX-License-Identifier: GPL-2.0-or-later
+#  See LICENSE.md for more information.
+
+"""Speed control commands for inputstream.tempo. Run through command.py.
 
 Commands:
     speed_up     bump tempo by one step, clamped to max
@@ -18,6 +23,8 @@ import json
 import sys
 import time
 
+import xbmc
+import xbmcaddon
 import xbmcgui
 import xbmcvfs
 
@@ -30,6 +37,14 @@ NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
 # Sentinel written by the calling addon while tempo is the active inputstream.
 # Keys/dialog are no-ops if missing, so bindings don't affect non-tempo playback.
 ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
+
+# String id: the heading of the speed list.
+PLAYBACK_SPEED = 30700
+
+# Where a rate file may live: Kodi's temp folder, which is where callers put
+# it, or an add-on's data folder. The demuxer holds the tempo_file property to
+# the same two folders (IsAllowedTempoFile in StreamManager.cpp).
+ALLOWED_ROOTS = ('special://temp/', 'special://profile/addon_data/')
 
 DEFAULT_STEP = 0.10
 DEFAULT_MIN = 0.5
@@ -60,6 +75,20 @@ def resolve_files():
     if not tempo_file:
         return TEMPO_FILE, CONFIG_FILE
     return tempo_file, fields.get('config_file') or CONFIG_FILE
+
+
+def is_allowed(path):
+    """True when path is inside one of ALLOWED_ROOTS, with links followed.
+
+    The sentinel is a file any add-on can write, and the speed keys replace
+    the file it names, so that name must not be free to point anywhere.
+    """
+    real = os.path.normcase(os.path.realpath(path))
+    for root in ALLOWED_ROOTS:
+        base = os.path.normcase(os.path.realpath(xbmcvfs.translatePath(root)))
+        if real.startswith(base + os.sep):
+            return True
+    return False
 
 
 def read_config(config_file=CONFIG_FILE):
@@ -123,7 +152,9 @@ def pick_via_dialog(current, lo, hi, step):
     labels = [format_speed(v) for v in values]
     # Preselect the nearest listed value.
     idx = min(range(len(values)), key=lambda i: abs(values[i] - current))
-    sel = xbmcgui.Dialog().select('Playback speed', labels, preselect=idx)
+    # Named by id: a keymap from an earlier version runs this file by path.
+    heading = xbmcaddon.Addon('inputstream.tempo').getLocalizedString(PLAYBACK_SPEED)
+    sel = xbmcgui.Dialog().select(heading, labels, preselect=idx)
     if sel < 0:
         return current
     return values[sel]
@@ -138,12 +169,15 @@ def queue_notification(display):
         pass
 
 
-if __name__ == '__main__':
+def main(cmd):
     if not os.path.exists(ACTIVE_FILE):
-        sys.exit(0)
+        return
 
-    cmd = sys.argv[1] if len(sys.argv) > 1 else ''
     tempo_file, config_file = resolve_files()
+    if not is_allowed(tempo_file):
+        xbmc.log('inputstream.tempo: speed key ignored, the tempo file is outside '
+                 "Kodi's temp and add-on data folders: {}".format(tempo_file), xbmc.LOGWARNING)
+        return
     step, lo, hi = read_config(config_file)
     current = read_tempo(tempo_file)
 
@@ -158,3 +192,8 @@ if __name__ == '__main__':
         write_tempo(new_speed, tempo_file)
         set_props(new_speed)
         queue_notification(format_speed(new_speed))
+
+
+if __name__ == '__main__':
+    # A keymap installed by an earlier version runs this file by its path.
+    main(sys.argv[1] if len(sys.argv) > 1 else '')

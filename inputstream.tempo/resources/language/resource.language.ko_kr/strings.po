@@ -1,7 +1,7 @@
 # Kodi Media Center language file
-# Addon Name: Inputstream.ffmpegdirect
-# Addon id: inputstream.ffmpegdirect
-# Addon Provider: phunkyfish
+# Addon Name: Inputstream Tempo
+# Addon id: inputstream.tempo
+# Addon Provider: kontell
 msgid ""
 msgstr ""
 "Report-Msgid-Bugs-To: translations@kodi.tv\n"
@@ -16,12 +16,12 @@ msgstr ""
 "X-Generator: Weblate 5.15.2\n"
 
 msgctxt "Addon Summary"
-msgid "InputStream Client for FFmpeg streams (libavformat)"
-msgstr "FFmpeg 스트림용 InputStream 클라이언트(libavformat)"
+msgid "InputStream client with tempo control (pitch-corrected playback speed) for audio and video"
+msgstr ""
 
 msgctxt "Addon Description"
-msgid "InputStream Client for streams that can be opened by either FFmpeg's libavformat or Kodi's cURL. Common stream formats such as plain TS, HLS and DASH (without DRM) are supported as well as many others.[CR][CR]The addon also has support for Archive/Catchup services where there is a replay windows (usually in days) and can timeshift across that span.[CR][CR]For documenation visit: https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md"
-msgstr "FFmpeg의 libavformat 또는 Kodi의 cURL로 열 수 있는 스트림용 InputStream 클라이언트. 일반 TS, HLS 및 DASH(DRM 제외)와 같은 일반적인 스트림 형식은 물론 다른 많은 형식도 지원됩니다.[CR][CR]이 애드온은 재생 창(보통 며칠)이 있는 아카이브/따라잡기 서비스도 지원합니다. 해당 범위에서 타임시프트할 수 있습니다.[CR][CR]문서를 보려면 https://github.com/xbmc/inputstream.ffmpegdirect/blob/Matrix/README.md를 방문하세요"
+msgid "InputStream client based on FFmpeg with built-in tempo processing. Supports pitch-corrected playback speed from 0.5x to 100x for audiobooks and podcasts, and rate-shifts video and subtitles in step with the audio so the same control works for video. Based on inputstream.ffmpegdirect."
+msgstr ""
 
 #. settings labels
 #. label-category: Network
@@ -187,8 +187,8 @@ msgstr "이 범주에는 시간이동에 대한 설정이 포함되어 있습니
 
 #. help: Timeshift - timeshiftBufferPath
 msgctxt "#30621"
-msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] property is passed to the addon."
-msgstr "시간이동 버퍼를 저장하는 데 사용되는 경로입니다. 기본값은 userdata의 [I]\"addon_data/inputstream.ffmpegdirect/timeshift\"[/I] 폴더입니다. 이 폴더는 Kodi 시작 시 시간이동 파일에서 지워집니다. [I]\"inputstream.ffmpegdirect.stream_mode=timeshift\"[/I] 속성이 애드온에 전달된 경우에만 관련이 있습니다."
+msgid "The path used to store the timeshift buffer. The default is the [I]\"addon_data/inputstream.tempo/timeshift\"[/I] folder in userdata. Note that this folder will be cleared  of timeshift files on Kodi startup. Only relevant when [I]\"inputstream.tempo.stream_mode=timeshift\"[/I] property is passed to the addon."
+msgstr "시간이동 버퍼를 저장하는 데 사용되는 경로입니다. 기본값은 userdata의 [I]\"addon_data/inputstream.tempo/timeshift\"[/I] 폴더입니다. 이 폴더는 Kodi 시작 시 시간이동 파일에서 지워집니다. [I]\"inputstream.tempo.stream_mode=timeshift\"[/I] 속성이 애드온에 전달된 경우에만 관련이 있습니다."
 
 #. help: Timeshift - timeshiftEnableLimit
 msgctxt "#30622"
@@ -229,8 +229,8 @@ msgstr "선언 파일(예: HLD/DASH/부드러운 스트리밍)이 있는 스트�
 
 #. help: Advanced - forceRealtimeOffCatchup
 msgctxt "#30645"
-msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
-msgstr "라이브 스트림이 라이브가 아니라고 보고하는 HLS와 같은 특정 따라잡기 스트림의 경우 스트림 열기 횟수를 개선할 수 있습니다. 따라잡기 스트림/제공자에 대해 이 옵션을 시험하는 경우, 문제의 M3U 항목에 [I]\"#KODIPROP=inputstream.ffmpegdirect.is_realtime_stream=false\"[/I]를 추가하십시오. 이 설정은 모든 스트림에 사용해서는 안 됩니다."
+msgid "For certain catchup streams such as HLS reporting that a live stream is not live can improve stream open times. If testing this option works for a catchup stream/provider, then add a [I]\"#KODIPROP=inputstream.tempo.is_realtime_stream=false\"[/I] to the M3U entry in question. This setting should not be left enabled for all streams."
+msgstr "라이브 스트림이 라이브가 아니라고 보고하는 HLS와 같은 특정 따라잡기 스트림의 경우 스트림 열기 횟수를 개선할 수 있습니다. 따라잡기 스트림/제공자에 대해 이 옵션을 시험하는 경우, 문제의 M3U 항목에 [I]\"#KODIPROP=inputstream.tempo.is_realtime_stream=false\"[/I]를 추가하십시오. 이 설정은 모든 스트림에 사용해서는 안 됩니다."
 
 #. help: Advanced - disableStrictHLSfileExtensionCheck
 msgctxt "#30646"

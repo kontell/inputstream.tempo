@@ -1,12 +1,20 @@
+#  Copyright (C) 2005-2021 Team Kodi (https://kodi.tv)
+#  Copyright (C) 2026 kontell
+#
+#  SPDX-License-Identifier: GPL-2.0-or-later
+#  See LICENSE.md for more information.
+
 """inputstream.tempo background service.
 
 Updates Window(Home) properties with current playback speed so skins can
-display it. Also auto-installs the keyboard shortcut keymap on first run
-and cleans up timeshift buffer files on startup.
+display it, and cleans up timeshift buffer files on startup.
+
+The keyboard shortcuts are not installed from here. Kodi's keymaps folder
+is outside the add-on's own data, so that is done only when the user asks
+for it in the add-on's settings; see keymap.py.
 """
 
 import os
-import shutil
 import time
 
 import xbmc
@@ -19,32 +27,13 @@ ADDON = xbmcaddon.Addon()
 TEMPO_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo')
 NOTIFY_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_notify')
 ACTIVE_FILE = xbmcvfs.translatePath('special://temp/inputstream_tempo_active')
-KEYMAP_SRC = os.path.join(ADDON.getAddonInfo('path'), 'resources', 'keymap.xml')
-KEYMAP_DST = xbmcvfs.translatePath('special://userdata/keymaps/inputstream.tempo.xml')
+
+# String id: the heading of the speed notification.
+PLAYBACK_SPEED = 30700
 
 # Debounce: only emit notification after pending value is this old.
 # Rapid key presses keep bumping the timestamp, so only the final value shows.
 NOTIFY_DEBOUNCE = 0.35
-
-
-def install_keymap():
-    """Copy keymap.xml to Kodi's keymaps dir. Reinstalls when addon version
-    bumps the shipped keymap so updates (new keys) take effect automatically."""
-    if not os.path.exists(KEYMAP_SRC):
-        return
-    # Skip if destination already matches (avoids spurious reloadkeymaps).
-    try:
-        with open(KEYMAP_SRC, 'rb') as a, open(KEYMAP_DST, 'rb') as b:
-            if a.read() == b.read():
-                return
-    except (IOError, OSError):
-        pass
-    dst_dir = os.path.dirname(KEYMAP_DST)
-    if not os.path.exists(dst_dir):
-        os.makedirs(dst_dir)
-    shutil.copy2(KEYMAP_SRC, KEYMAP_DST)
-    xbmc.executebuiltin('Action(reloadkeymaps)')
-    xbmc.log('inputstream.tempo: installed keymap to {}'.format(KEYMAP_DST), xbmc.LOGINFO)
 
 
 def clear_stale_sentinel():
@@ -110,7 +99,6 @@ def cleanup_timeshift():
 
 
 def run():
-    install_keymap()
     cleanup_timeshift()
     clear_stale_sentinel()
 
@@ -119,7 +107,7 @@ def run():
     win = xbmcgui.Window(10000)
     was_playing = False
 
-    xbmc.log('inputstream.tempo: service started', xbmc.LOGINFO)
+    xbmc.log('inputstream.tempo: service started', xbmc.LOGDEBUG)
 
     while not monitor.abortRequested():
         if monitor.waitForAbort(0.2):
@@ -132,8 +120,11 @@ def run():
                 with open(NOTIFY_FILE) as f:
                     ts_str, _, display = f.read().strip().partition('|')
                 if time.time() - float(ts_str) >= NOTIFY_DEBOUNCE:
-                    xbmc.executebuiltin(
-                        'Notification(Playback Speed, {}, 1200)'.format(display))
+                    # Quoted, so a comma in a translated heading is not read
+                    # as the end of the argument.
+                    heading = ADDON.getLocalizedString(PLAYBACK_SPEED)
+                    xbmc.executebuiltin('Notification("{}","{}",1200)'.format(
+                        heading.replace('"', ''), display.replace('"', '')))
                     os.remove(NOTIFY_FILE)
         except Exception:
             try:
@@ -160,7 +151,7 @@ def run():
             win.clearProperty('InputstreamTempo.Active')
             was_playing = False
 
-    xbmc.log('inputstream.tempo: service stopped', xbmc.LOGINFO)
+    xbmc.log('inputstream.tempo: service stopped', xbmc.LOGDEBUG)
 
 
 if __name__ == '__main__':
